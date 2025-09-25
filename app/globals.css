@@ -1,26 +1,119 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Permite aplicar estilos de modo escuro com a classe .dark */
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Tema claro inspirado no Product Hunt */
+:root {
+  --radius: 0.625rem;
+
+  /* Base e textos */
+  --background: #faf8f7; /* cinza claro quente */
+  --foreground: #2d2d2d; /* cinza escuro */
+
+  --card: #ffffff;
+  --card-foreground: #2d2d2d;
+
+  --popover: #ffffff;
+  --popover-foreground: #2d2d2d;
+
+  /* Primária: laranja coral (similar ao #da552f, mas ajustada) */
+  --primary: #e85d3a;
+  --primary-foreground: #ffffff;
+
+  /* Secundária: pêssego pastel para destaques suaves */
+  --secondary: #ffe8e0;
+  --secondary-foreground: #2d2d2d;
+
+  /* Neutros/muted */
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+
+  /* Acento: marrom‑mauve inspirado nos tons arroxeados do Product Hunt */
+  --accent: #9c837f;
+  --accent-foreground: #2d2d2d;
+
+  --destructive: #ef4444;
+
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #e85d3a;
+
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+}
+
+/* Tema escuro inspirado no Product Hunt */
+.dark {
+  --background: #1f1a17; /* marrom‑preto */
+  --foreground: #f5f5f5;
+
+  --card: #2b2623;
+  --card-foreground: #f5f5f5;
+
+  --popover: #2b2623;
+  --popover-foreground: #f5f5f5;
+
+  --primary: #e85d3a; /* mantém o laranja como acento */
+  --primary-foreground: #1f1a17;
+
+  --secondary: #c06953; /* marrom acobreado para detalhes */
+  --secondary-foreground: #f5f5f5;
+
+  --muted: #2f2b29;
+  --muted-foreground: #9ca3af;
+
+  --accent: #685351;
+  --accent-foreground: #f5f5f5;
+
+  --destructive: #f87171;
+
+  --border: rgba(229, 231, 235, 0.16);
+  --input: rgba(229, 231, 235, 0.18);
+  --ring: #e85d3a;
+
+  --text-primary: #f5f5f5;
+  --text-secondary: #9ca3af;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
