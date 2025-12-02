@@ -36,17 +36,17 @@
   --radius: 0.625rem;
 
   /* Base e textos */
-  --background: #faf8f7; /* cinza claro quente */
+  --background: #faf9f7; /* bege claro inspirado no Cifra Club */
   --foreground: #2d2d2d; /* cinza escuro */
 
   --card: #ffffff;
-  --card-foreground: #2d2d2d;
+  --card-foreground: var(--foreground);
 
   --popover: #ffffff;
   --popover-foreground: #2d2d2d;
 
   /* Primária: laranja coral (similar ao #da552f, mas ajustada) */
-  --primary: #e85d3a;
+  --primary: #ff6254;
   --primary-foreground: #ffffff;
 
   /* Secundária: pêssego pastel para destaques suaves */

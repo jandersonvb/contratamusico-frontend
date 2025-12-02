@@ -93,7 +93,7 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         </div>
         <div className="mt-auto flex gap-2">
           <Button size="sm" asChild>
-            <Link href={`/musicos/${musician.id}`}>Ver Perfil</Link>
+            <Link href={`/musico/${musician.id}`}>Ver Perfil</Link>
           </Button>
           <Button variant="outline" size="sm">
             <Mail className="h-4 w-4 mr-1" /> Contatar

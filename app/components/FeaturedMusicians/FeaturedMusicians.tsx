@@ -48,8 +48,11 @@ export function FeaturedMusicians() {
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {mock.map((m) => (
-            <Card key={m.id} className="overflow-hidden">
-              <div className="relative h-48 w-full">
+            <Card
+              key={m.id}
+              className="overflow-hidden shadow-lg hover:shadow-xl w-[300px] transition-shadow"
+            >
+              <div className="relative h-56 w-full">
                 <Image
                   src={m.photo}
                   alt={m.name}
@@ -60,8 +63,8 @@ export function FeaturedMusicians() {
                   {m.badge}
                 </span>
               </div>
-              <CardContent className="p-6">
-                <h3 className="mb-1 text-lg font-semibold">{m.name}</h3>
+              <CardContent className="p-8">
+                <h3 className="mb-2 text-xl font-semibold">{m.name}</h3>
                 <div className="mb-2 text-sm text-primary">{m.category}</div>
                 <div className="mb-2 text-sm text-muted-foreground">
                   {m.city}
