@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -53,7 +53,6 @@ export function UserMenu() {
           aria-label="Menu do usuário"
         >
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user?.avatarUrl ?? ""} alt="Avatar" />
             <AvatarFallback className="text-sm">{initials}</AvatarFallback>
           </Avatar>
         </Button>

@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Skeleton } from "@/components/ui/skeleton"; // Assuming Skeleton might not exist, will check or use div
 import { AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface FAQItem {
   id: string;

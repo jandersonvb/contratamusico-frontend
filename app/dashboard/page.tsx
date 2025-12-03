@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserStore } from "@/lib/stores/userStore";
-import { CalendarDays, MessageSquare, Star, Users2, Plus } from "lucide-react";
+import { CalendarDays, MessageSquare, Plus, Star, Users2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();

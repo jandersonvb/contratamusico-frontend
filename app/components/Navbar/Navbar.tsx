@@ -1,15 +1,15 @@
 'use client';
 
-import { useUserStore } from "@/lib/stores/userStore";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useUserStore } from "@/lib/stores/userStore";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { useState } from "react";
 import { UserMenu } from "./components/UserMenu";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
-  const { user, isLoggedIn } = useUserStore(); // ajuste os nomes conforme teu store
+  const { isLoggedIn } = useUserStore();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur">

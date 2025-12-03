@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import {
-  howItWorksClient,
-  howItWorksMusician,
   benefits,
   faqComoFunciona,
+  howItWorksClient,
+  howItWorksMusician,
 } from "@/app/lib/data/comoFunciona";
 import {
   Accordion,
@@ -16,7 +14,9 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, PlayCircle } from "lucide-react";
+import { PlayCircle } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 export default function ComoFuncionaPage() {
   const [activeTab, setActiveTab] = useState<"client" | "musician">("client");
