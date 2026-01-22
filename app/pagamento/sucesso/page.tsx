@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2, XCircle } from "lucide-react";
@@ -8,10 +8,9 @@ import { getMySubscription } from "@/api/payment";
 import type { SubscriptionResponse } from "@/api/payment";
 
 /**
- * Página de sucesso após completar o checkout do Stripe
- * Exibe confirmação da assinatura e detalhes do plano
+ * Componente interno que usa useSearchParams
  */
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
@@ -197,5 +196,26 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Página de sucesso após completar o checkout do Stripe
+ * Exibe confirmação da assinatura e detalhes do plano
+ */
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

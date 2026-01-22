@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +29,6 @@ import { MusicianProfile } from "@/lib/types/musician";
 import { createBooking } from "@/api/booking";
 import { addFavorite, removeFavorite, isFavorite } from "@/api/favorite";
 import { useUserStore } from "@/lib/stores/userStore";
-import { useEffect } from "react";
 
 interface MusicianDetailClientProps {
   musician: MusicianProfile;
@@ -52,20 +51,20 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
 
+  const checkIfFavorite = useCallback(async () => {
+    try {
+      const isFav = await isFavorite(musician.id);
+      setFavorite(isFav);
+    } catch {
+      // Silently fail
+    }
+  }, [musician.id]);
+
   useEffect(() => {
     if (isLoggedIn) {
       checkIfFavorite();
     }
-  }, [isLoggedIn, musician.id]);
-
-  const checkIfFavorite = async () => {
-    try {
-      const isFav = await isFavorite(musician.id);
-      setFavorite(isFav);
-    } catch (error) {
-      // Silently fail
-    }
-  };
+  }, [isLoggedIn, checkIfFavorite]);
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

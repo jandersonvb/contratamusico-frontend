@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -29,11 +29,7 @@ export default function PlanosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [processingPlanId, setProcessingPlanId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchPlans();
-  }, [category]);
-
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await getPlans(category);
@@ -44,7 +40,11 @@ export default function PlanosPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [category]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isLoggedIn) {

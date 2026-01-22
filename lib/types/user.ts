@@ -17,7 +17,7 @@ export interface MusicianInstrument {
   slug: string;
 }
 
-export interface MusicianProfile {
+export interface UserMusicianProfile {
   id: number;
   category?: string;
   bio?: string;
@@ -47,7 +47,7 @@ export interface User {
   phone?: string;
   city?: string;
   state?: string;
-  musicianProfile?: MusicianProfile | null;
+  musicianProfile?: UserMusicianProfile | null;
   createdAt?: string;
   updatedAt?: string;
 }

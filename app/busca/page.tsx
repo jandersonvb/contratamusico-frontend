@@ -17,7 +17,6 @@ import { useSearchStore } from "@/lib/stores/searchStore";
 import { useLocationStore } from "@/lib/stores/locationStore";
 import { useInstrumentStore } from "@/lib/stores/instrumentStore";
 import { useGenreStore } from "@/lib/stores/genreStore";
-import { defaultFilters } from "@/lib/types/search";
 
 export default function SearchPage() {
   // Search Store
@@ -49,7 +48,7 @@ export default function SearchPage() {
   // Busca inicial ao montar o componente
   useEffect(() => {
     performSearch();
-  }, []);
+  }, [performSearch]);
 
   // Handler para mudança de filtros (com debounce implícito ao clicar em "Buscar")
   const handleFiltersChange = (newFilters: typeof filters) => {

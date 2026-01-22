@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { searchMusicians } from '@/api/musician';
 import { SearchState, SearchFilters, defaultFilters, SearchMusiciansParams } from '../types/search';
-import { MusicianListItem, PaginatedMusiciansResponse } from '../types/musician';
 
 export const useSearchStore = create<SearchState>()(
   devtools(

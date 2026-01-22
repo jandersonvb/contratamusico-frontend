@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
@@ -126,14 +126,7 @@ export default function PerfilPage() {
     }
   }, [user, musicianProfile]);
 
-  // Buscar dados de assinatura quando acessar a aba
-  useEffect(() => {
-    if (activeTab === "assinatura" && isLoggedIn && !subscriptionData) {
-      fetchSubscriptionData();
-    }
-  }, [activeTab, isLoggedIn]);
-
-  const fetchSubscriptionData = async () => {
+  const fetchSubscriptionData = useCallback(async () => {
     setIsLoadingSubscription(true);
     try {
       const data = await getMySubscription();
@@ -144,7 +137,14 @@ export default function PerfilPage() {
     } finally {
       setIsLoadingSubscription(false);
     }
-  };
+  }, []);
+
+  // Buscar dados de assinatura quando acessar a aba
+  useEffect(() => {
+    if (activeTab === "assinatura" && isLoggedIn && !subscriptionData) {
+      fetchSubscriptionData();
+    }
+  }, [activeTab, isLoggedIn, subscriptionData, fetchSubscriptionData]);
 
   const handleCancelSubscription = async () => {
     setIsProcessingAction(true);

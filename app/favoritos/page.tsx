@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/lib/stores/userStore";
 import { getMyFavorites, removeFavorite } from "@/api/favorite";
 import type { Favorite } from "@/api/favorite";
-import { Loader2, Heart, Star, MapPin } from "lucide-react";
+import { Loader2, Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
