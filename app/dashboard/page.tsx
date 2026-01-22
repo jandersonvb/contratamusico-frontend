@@ -1,28 +1,60 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserStore } from "@/lib/stores/userStore";
-import { CalendarDays, MessageSquare, Plus, Star, Users2 } from "lucide-react";
+import { CalendarDays, MessageSquare, Plus, Star, Users2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getMyBookings, Booking } from "@/api/booking";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useUserStore();
+  const { user, isLoggedIn, isLoading: userLoading } = useUserStore();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
 
-  // Dados mock – substitua por fetch ao seu backend
+  useEffect(() => {
+    if (!userLoading && !isLoggedIn) {
+      router.push("/login");
+    }
+  }, [isLoggedIn, userLoading, router]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchBookings();
+    }
+  }, [isLoggedIn]);
+
+  const fetchBookings = async () => {
+    try {
+      const data = await getMyBookings();
+      setBookings(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar contratações';
+      toast.error(message);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  };
+
+  // Estatísticas dinâmicas
   const stats = [
-    { label: "Convites recebidos", value: 8, icon: Users2 },
-    { label: "Mensagens não lidas", value: 3, icon: MessageSquare },
-    { label: "Próximos eventos", value: 2, icon: CalendarDays },
-    { label: "Avaliação média", value: "4,8", icon: Star },
+    { label: "Total de contratações", value: bookings.length, icon: Users2 },
+    { label: "Mensagens não lidas", value: 0, icon: MessageSquare }, // TODO: implementar mensagens
+    { label: "Próximos eventos", value: bookings.filter(b => b.status === "confirmado").length, icon: CalendarDays },
+    { label: "Avaliação média", value: "N/A", icon: Star }, // TODO: buscar do perfil do músico
   ];
 
-  const proximos = [
-    { id: 1, titulo: "Casamento – Espaço Garden", data: "10/11/2025", cidade: "Itajubá/MG", status: "confirmado" },
-    { id: 2, titulo: "Aniversário 30 anos", data: "23/11/2025", cidade: "Pouso Alegre/MG", status: "negociando" },
-  ];
+  if (userLoading || isLoadingBookings) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -64,31 +96,40 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-3 gap-4 mt-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Próximos eventos</CardTitle>
+            <CardTitle>Minhas Solicitações</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {proximos.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between rounded-md border p-3"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{p.titulo}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {p.data} • {p.cidade}
-                  </div>
-                </div>
-                <Badge
-                  variant={p.status === "confirmado" ? "default" : "secondary"}
-                  className="capitalize"
-                >
-                  {p.status}
-                </Badge>
+            {bookings.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Nenhuma solicitação encontrada
               </div>
-            ))}
-            <Button variant="outline" onClick={() => {/* ir para agenda */}}>
-              Ver agenda completa
-            </Button>
+            ) : (
+              bookings.slice(0, 5).map((booking) => (
+                <div
+                  key={booking.id}
+                  className="flex items-center justify-between rounded-md border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{booking.eventType}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(booking.eventDate).toLocaleDateString('pt-BR')}
+                      {booking.musicianName && ` • ${booking.musicianName}`}
+                    </div>
+                  </div>
+                  <Badge
+                    variant={booking.status === "confirmado" ? "default" : "secondary"}
+                    className="capitalize"
+                  >
+                    {booking.status}
+                  </Badge>
+                </div>
+              ))
+            )}
+            {bookings.length > 5 && (
+              <Button variant="outline" className="w-full">
+                Ver todas ({bookings.length})
+              </Button>
+            )}
           </CardContent>
         </Card>
 

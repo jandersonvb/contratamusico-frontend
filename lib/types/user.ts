@@ -5,11 +5,35 @@ export enum UserType {
 }
 
 // Interface baseada no retorno do backend (UserWithProfile)
+export interface MusicianGenre {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface MusicianInstrument {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 export interface MusicianProfile {
   id: number;
-  userId: number;
-  experience?: string;
+  category?: string;
+  bio?: string;
+  location?: string;
   priceFrom?: number;
+  experience?: string;
+  equipment?: string;
+  availability?: string;
+  rating?: number;
+  ratingCount?: number;
+  eventsCount?: number;
+  satisfactionRate?: number;
+  responseTime?: string;
+  isFeatured?: boolean;
+  genres: MusicianGenre[];
+  instruments: MusicianInstrument[];
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +55,7 @@ export interface User {
 export interface UserState {
   user: User | null;
   isLoading: boolean;
+  isUpdating: boolean;
   isLoggedIn: boolean;
   error: string | null;
   
@@ -39,6 +64,7 @@ export interface UserState {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   setUser: (user: User) => void;
+  updateUser: (data: UpdateUserData) => Promise<void>;
 }
 
 // Tipos para Login
@@ -51,4 +77,32 @@ export interface LoginCredentials {
 export interface AuthResponse {
   access_token: string;
   user: User;
+}
+
+// DTO para atualização de usuário (espelha UpdateUserDto do backend)
+export interface UpdateUserData {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+}
+
+// DTO para registro de usuário
+export interface RegisterUserData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  userType: UserType;
+  phone?: string;
+  city?: string;
+  state?: string;
+  terms: boolean;
+  // Campos específicos para músicos
+  instruments?: string[]; // Array de slugs de instrumentos
+  genres?: string[]; // Array de slugs de gêneros
+  experience?: string;
+  priceRange?: string;
 }

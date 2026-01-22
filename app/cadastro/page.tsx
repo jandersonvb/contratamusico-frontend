@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { UserPlus, Calendar, Music, EyeOff, Eye } from "lucide-react";
+import { UserPlus, Calendar, Music, EyeOff, Eye, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,9 +15,15 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { registerUser } from "@/api/auth";
+import { UserType } from "@/lib/types/user";
+import { useUserStore } from "@/lib/stores/userStore";
 
 
 export default function CadastroPage() {
+  const router = useRouter();
+  const { setUser } = useUserStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [userType, setUserType] = useState<"cliente" | "musico">("cliente");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -123,8 +130,9 @@ export default function CadastroPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     // Basic client-side validation
     if (form.password !== form.confirmPassword) {
       toast.error("As senhas não coincidem");
@@ -134,24 +142,54 @@ export default function CadastroPage() {
       toast.error("Você precisa aceitar os termos para continuar");
       return;
     }
-    toast.success("Conta criada com sucesso! Bem-vindo(a) à plataforma.");
-    // Reset form (optional)
-    setForm({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      city: "",
-      state: "",
-      instruments: [],
-      genres: [],
-      experience: "",
-      priceRange: "",
-      password: "",
-      confirmPassword: "",
-      terms: false,
-    });
-    setUserType("cliente");
+    if (form.password.length < 8) {
+      toast.error("A senha deve ter no mínimo 8 caracteres");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Remove formatação do telefone (mantém apenas números)
+      const cleanPhone = form.phone ? form.phone.replace(/\D/g, '') : undefined;
+
+      const registerData = {
+        email: form.email,
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        userType: userType === "musico" ? UserType.MUSICIAN : UserType.CLIENT,
+        phone: cleanPhone || undefined,
+        city: form.city || undefined,
+        state: form.state || undefined,
+        terms: form.terms,
+        // Dados específicos para músicos
+        ...(userType === "musico" && {
+          instruments: form.instruments,
+          genres: form.genres,
+          experience: form.experience || undefined,
+          priceRange: form.priceRange || undefined,
+        }),
+      };
+
+      const response = await registerUser(registerData);
+
+      // Salvar token e usuário
+      localStorage.setItem('token', response.access_token);
+      setUser(response.user);
+
+      toast.success("Conta criada com sucesso! Bem-vindo(a) à plataforma.");
+      
+      // Redirecionar para o dashboard
+      router.push("/dashboard");
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao criar conta';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -182,7 +220,7 @@ export default function CadastroPage() {
               >
                 <Calendar className="h-5 w-5 mb-1" />
                 <h3 className="font-medium">Sou Cliente</h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-center">
                   Quero contratar músicos para meus eventos
                 </p>
               </button>
@@ -197,7 +235,7 @@ export default function CadastroPage() {
               >
                 <Music className="h-5 w-5 mb-1" />
                 <h3 className="font-medium">Sou Músico</h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-center">
                   Quero oferecer meus serviços musicais
                 </p>
               </button>
@@ -273,14 +311,14 @@ export default function CadastroPage() {
                         handleSelectChange("state", value)
                       }
                     >
-                      <SelectTrigger id="state" className="w-full">
+                      <SelectTrigger id="state" className="w-full hover:cursor-pointer">
                         {form.state
                           ? states.find((s) => s.value === form.state)?.label
                           : "Selecione"}
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="hover:cursor-pointer">
                         {states.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>
+                          <SelectItem key={s.value} value={s.value} className="hover:cursor-pointer hover:bg-primary/10 hover:text-primary">
                             {s.label}
                           </SelectItem>
                         ))}
@@ -464,8 +502,15 @@ export default function CadastroPage() {
               </div>
               {/* Submit */}
               <div className="space-y-4">
-                <Button type="submit" className="w-full">
-                  Criar Conta
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Criando conta...
+                    </>
+                  ) : (
+                    "Criar Conta"
+                  )}
                 </Button>
                 <div className="relative flex items-center justify-center">
                   <span className="absolute bg-card px-2 text-xs text-muted-foreground">

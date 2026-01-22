@@ -1,34 +1,64 @@
-import { User } from "@/lib/types/user";
+import { User, UpdateUserData } from "@/lib/types/user";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+/**
+ * Busca dados do usuário logado (alternativa ao auth.ts)
+ * @deprecated Use fetchUserDataFromApi de api/auth.ts
+ */
 export async function fetchUserDataFromApi(): Promise<User> {
-  const API_USER_URL = process.env.NEXT_PUBLIC_API_BASE_URL + '/auth/me';
-
   const token = localStorage.getItem('token');
 
   if (!token) {
-    throw new Error('No token found');
+    throw new Error('Token não encontrado');
   }
 
-  try {
-    const response = await fetch(API_USER_URL, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-
-      throw new Error(errorData?.message || `Fail to fetch user data: ${response.status} ${response.statusText}`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
     }
-
-    const data: User = await response.json();
-
-    return data;
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    throw error;
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || `Falha ao buscar dados do usuário: ${response.status}`);
   }
+
+  return response.json();
+}
+
+/**
+ * Atualiza dados do usuário logado
+ * PATCH /users/me
+ */
+export async function updateUserApi(data: UpdateUserData): Promise<User> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Token não encontrado');
+  }
+
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Falha ao atualizar dados do usuário');
+  }
+
+  return response.json();
 }

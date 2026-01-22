@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,10 +14,25 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 
-import { Star, MapPin, Camera } from "lucide-react";
+import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { toast } from "sonner";
-import { musicianDetails } from "@/lib/musicianDetails";
+import { useUserStore } from "@/lib/stores/userStore";
+import { UserType } from "@/lib/types/user";
+import { getMySubscription, cancelSubscription, reactivateSubscription, createPortalSession } from "@/api/payment";
+import type { SubscriptionResponse } from "@/api/payment";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 /**
  * Profile page that allows the logged in musician to view and edit their
@@ -26,8 +42,26 @@ import { musicianDetails } from "@/lib/musicianDetails";
  * toggle between read‑only and editable modes.
  */
 export default function PerfilPage() {
-  // Assume the logged in musician is the first entry in our sample data
-  const user = musicianDetails[0];
+  const router = useRouter();
+  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
+  
+  // Verificar autenticação
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      router.push("/login");
+    }
+  }, [isLoggedIn, isLoading, router]);
+
+  // Buscar dados atualizados do usuário ao carregar a página
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchUser();
+    }
+  }, [isLoggedIn, fetchUser]);
+
+  // Dados do perfil de músico (se existir)
+  const musicianProfile = user?.musicianProfile;
+  const isMusician = user?.userType === UserType.MUSICIAN;
 
   // Tabs state
   const [activeTab, setActiveTab] = useState<
@@ -35,32 +69,130 @@ export default function PerfilPage() {
     | "info-musicais"
     | "portfolio"
     | "avaliacoes"
+    | "assinatura"
     | "configuracoes"
   >("info-pessoais");
+
+  // Subscription state
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionResponse | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Editing states
   const [editPersonal, setEditPersonal] = useState(false);
   const [editMusical, setEditMusical] = useState(false);
 
-  // Form states
+  // Form states - inicializado vazio, será preenchido pelo useEffect
   const [personalForm, setPersonalForm] = useState({
-    firstName: user.name.split(" ")[0] || "",
-    lastName: user.name.split(" ")[1] || "",
-    email: "joao.silva@email.com",
-    phone: "(11) 99999-9999",
-    birthDate: "1990-05-15",
-    city: user.location.split(",")[0] || "",
-    state: user.location.split(",")[1]?.trim() || "",
-    bio: user.about.join("\n\n"),
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    city: "",
+    state: "",
+    bio: "",
   });
 
   const [musicalForm, setMusicalForm] = useState({
-    instruments: user.instruments,
-    genres: user.tags,
-    experience: user.experience,
-    priceRange: "300-500",
-    equipment: user.equipment,
+    instruments: [] as string[],
+    genres: [] as string[],
+    experience: "",
+    priceRange: "",
+    equipment: "",
   });
+
+  // Atualizar formulários quando os dados do usuário carregarem
+  useEffect(() => {
+    if (user) {
+      setPersonalForm({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        city: user.city || "",
+        state: user.state || "",
+        bio: musicianProfile?.bio || "",
+      });
+
+      if (musicianProfile) {
+        setMusicalForm({
+          instruments: musicianProfile.instruments?.map((i) => i.name) || [],
+          genres: musicianProfile.genres?.map((g) => g.name) || [],
+          experience: musicianProfile.experience || "",
+          priceRange: musicianProfile.priceFrom ? getPriceRangeFromValue(musicianProfile.priceFrom) : "",
+          equipment: musicianProfile.equipment || "",
+        });
+      }
+    }
+  }, [user, musicianProfile]);
+
+  // Buscar dados de assinatura quando acessar a aba
+  useEffect(() => {
+    if (activeTab === "assinatura" && isLoggedIn && !subscriptionData) {
+      fetchSubscriptionData();
+    }
+  }, [activeTab, isLoggedIn]);
+
+  const fetchSubscriptionData = async () => {
+    setIsLoadingSubscription(true);
+    try {
+      const data = await getMySubscription();
+      setSubscriptionData(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao carregar assinatura";
+      toast.error(message);
+    } finally {
+      setIsLoadingSubscription(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setIsProcessingAction(true);
+    try {
+      const response = await cancelSubscription();
+      toast.success(response.message);
+      await fetchSubscriptionData(); // Recarregar dados
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao cancelar assinatura";
+      toast.error(message);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setIsProcessingAction(true);
+    try {
+      const response = await reactivateSubscription();
+      toast.success(response.message);
+      await fetchSubscriptionData(); // Recarregar dados
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao reativar assinatura";
+      toast.error(message);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleOpenPortal = async () => {
+    setIsProcessingAction(true);
+    try {
+      const { portalUrl } = await createPortalSession(window.location.href);
+      window.location.href = portalUrl;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao abrir portal";
+      toast.error(message);
+      setIsProcessingAction(false);
+    }
+  };
+
+  // Função auxiliar para converter priceFrom em faixa de preço
+  const getPriceRangeFromValue = (value: number): string => {
+    if (value >= 800) return "800+";
+    if (value >= 500) return "500-800";
+    if (value >= 300) return "300-500";
+    return "0-300";
+  };
 
   // Options for selects and checkboxes
   const instrumentOptions = [
@@ -111,17 +243,39 @@ export default function PerfilPage() {
     setMusicalForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const savePersonalInfo = (e: React.FormEvent) => {
+  const savePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Informações pessoais atualizadas!");
-    setEditPersonal(false);
+    try {
+      await updateUser({
+        firstName: personalForm.firstName,
+        lastName: personalForm.lastName,
+        phone: personalForm.phone,
+        city: personalForm.city,
+        state: personalForm.state,
+      });
+      toast.success("Informações pessoais atualizadas!");
+      setEditPersonal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar";
+      toast.error(message);
+    }
   };
 
   const saveMusicalInfo = (e: React.FormEvent) => {
     e.preventDefault();
+    // TODO: Implementar endpoint de atualização de perfil de músico no backend
     toast.success("Informações musicais atualizadas!");
     setEditMusical(false);
   };
+
+  // Loading state
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -133,11 +287,8 @@ export default function PerfilPage() {
             <div className="bg-card border rounded-lg p-6 text-center">
               <div className="relative inline-block mb-4">
                 <Image
-                  src={
-                    user.portfolio[0]?.image ||
-                    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"
-                  }
-                  alt={user.name}
+                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"
+                  alt={`${user.firstName} ${user.lastName}`}
                   width={100}
                   height={100}
                   className="rounded-full object-cover h-24 w-24"
@@ -150,57 +301,67 @@ export default function PerfilPage() {
                   <Camera className="h-4 w-4" />
                 </button>
               </div>
-              <h2 className="text-lg font-semibold">{user.name}</h2>
-              <p className="text-sm text-muted-foreground mb-2">
-                {user.category}
-              </p>
-              <div className="flex items-center justify-center gap-1 mb-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-4 w-4 ${
-                      i < Math.round(user.rating)
-                        ? "text-yellow-400"
-                        : "text-muted-foreground"
-                    }`}
-                    fill={i < Math.round(user.rating) ? "currentColor" : "none"}
-                  />
-                ))}
-                <span className="text-xs text-muted-foreground ml-2">
-                  {user.rating.toFixed(1)} ({user.ratingCount})
-                </span>
-              </div>
-              <p className="text-xs flex items-center justify-center gap-1 text-muted-foreground">
-                <MapPin className="h-3 w-3" /> {user.location}
-              </p>
-              <div className="grid grid-cols-3 gap-4 mt-6 text-center">
-                <div>
-                  <div className="font-semibold">{user.events}</div>
-                  <div className="text-xs text-muted-foreground">Eventos</div>
+              <h2 className="text-lg font-semibold">{user.firstName} {user.lastName}</h2>
+              {isMusician && musicianProfile?.category && (
+                <p className="text-sm text-muted-foreground mb-2">
+                  {musicianProfile.category}
+                </p>
+              )}
+              {isMusician && musicianProfile?.rating !== undefined && (
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`h-4 w-4 ${
+                        i < Math.round(musicianProfile.rating || 0)
+                          ? "text-yellow-400"
+                          : "text-muted-foreground"
+                      }`}
+                      fill={i < Math.round(musicianProfile.rating || 0) ? "currentColor" : "none"}
+                    />
+                  ))}
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {(musicianProfile.rating || 0).toFixed(1)} ({musicianProfile.ratingCount || 0})
+                  </span>
                 </div>
-                <div>
-                  <div className="font-semibold">{user.satisfaction}%</div>
-                  <div className="text-xs text-muted-foreground">
-                    Satisfação
+              )}
+              {(user.city || user.state) && (
+                <p className="text-xs flex items-center justify-center gap-1 text-muted-foreground">
+                  <MapPin className="h-3 w-3" /> {user.city}{user.city && user.state ? ", " : ""}{user.state}
+                </p>
+              )}
+              {isMusician && musicianProfile && (
+                <div className="grid grid-cols-3 gap-4 mt-6 text-center">
+                  <div>
+                    <div className="font-semibold">{musicianProfile.eventsCount || 0}</div>
+                    <div className="text-xs text-muted-foreground">Eventos</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold">{musicianProfile.satisfactionRate || 0}%</div>
+                    <div className="text-xs text-muted-foreground">
+                      Satisfação
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-semibold">{musicianProfile.responseTime || "-"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Resp. Média
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="font-semibold">{user.responseTime}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Resp. Média
-                  </div>
+              )}
+              {isMusician && (
+                <div className="mt-6">
+                  <a
+                    href={`/musico/${musicianProfile?.id}`}
+                    target="_blank"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    rel="noopener noreferrer"
+                  >
+                    Ver Perfil Público
+                  </a>
                 </div>
-              </div>
-              <div className="mt-6">
-                <a
-                  href={`/musico/${user.id}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                  rel="noopener noreferrer"
-                >
-                  Ver Perfil Público
-                </a>
-              </div>
+              )}
             </div>
             {/* Navigation menu */}
             <nav className="flex flex-col space-y-2">
@@ -209,6 +370,7 @@ export default function PerfilPage() {
                 { id: "info-musicais", label: "Informações Musicais" },
                 { id: "portfolio", label: "Portfólio" },
                 { id: "avaliacoes", label: "Avaliações" },
+                { id: "assinatura", label: "Assinatura" },
                 { id: "configuracoes", label: "Configurações" },
               ].map((item) => (
                 <button
@@ -241,24 +403,31 @@ export default function PerfilPage() {
                     </Button>
                   ) : (
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={savePersonalInfo}>
-                        Salvar
+                      <Button size="sm" onClick={savePersonalInfo} disabled={isUpdating}>
+                        {isUpdating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Salvando...
+                          </>
+                        ) : (
+                          "Salvar"
+                        )}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={isUpdating}
                         onClick={() => {
                           setEditPersonal(false);
                           // Reset form values to original when canceling
                           setPersonalForm({
-                            firstName: user.name.split(" ")[0] || "",
-                            lastName: user.name.split(" ")[1] || "",
-                            email: personalForm.email,
-                            phone: personalForm.phone,
-                            birthDate: personalForm.birthDate,
-                            city: user.location.split(",")[0] || "",
-                            state: user.location.split(",")[1]?.trim() || "",
-                            bio: user.about.join("\n\n"),
+                            firstName: user.firstName || "",
+                            lastName: user.lastName || "",
+                            email: user.email || "",
+                            phone: user.phone || "",
+                            city: user.city || "",
+                            state: user.state || "",
+                            bio: musicianProfile?.bio || "",
                           });
                         }}
                       >
@@ -307,11 +476,13 @@ export default function PerfilPage() {
                       id="email"
                       type="email"
                       value={personalForm.email}
-                      onChange={(e) =>
-                        handlePersonalChange("email", e.target.value)
-                      }
-                      readOnly={!editPersonal}
+                      readOnly
+                      disabled
+                      className="bg-muted"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      O e-mail não pode ser alterado.
+                    </p>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
@@ -323,23 +494,6 @@ export default function PerfilPage() {
                         value={personalForm.phone}
                         onChange={(e) =>
                           handlePersonalChange("phone", e.target.value)
-                        }
-                        readOnly={!editPersonal}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label
-                        htmlFor="birthDate"
-                        className="text-sm font-medium"
-                      >
-                        Data de Nascimento
-                      </label>
-                      <Input
-                        id="birthDate"
-                        type="date"
-                        value={personalForm.birthDate}
-                        onChange={(e) =>
-                          handlePersonalChange("birthDate", e.target.value)
                         }
                         readOnly={!editPersonal}
                       />
@@ -411,13 +565,15 @@ export default function PerfilPage() {
                         variant="outline"
                         onClick={() => {
                           setEditMusical(false);
-                          setMusicalForm({
-                            instruments: user.instruments,
-                            genres: user.tags,
-                            experience: user.experience,
-                            priceRange: "300-500",
-                            equipment: user.equipment,
-                          });
+                          if (musicianProfile) {
+                            setMusicalForm({
+                              instruments: musicianProfile.instruments?.map((i) => i.name) || [],
+                              genres: musicianProfile.genres?.map((g) => g.name) || [],
+                              experience: musicianProfile.experience || "",
+                              priceRange: musicianProfile.priceFrom ? getPriceRangeFromValue(musicianProfile.priceFrom) : "",
+                              equipment: musicianProfile.equipment || "",
+                            });
+                          }
                         }}
                       >
                         Cancelar
@@ -567,6 +723,217 @@ export default function PerfilPage() {
                 <p className="text-sm text-muted-foreground">
                   Em breve você poderá ver as avaliações que recebeu.
                 </p>
+              </div>
+            )}
+            {/* Subscription Tab */}
+            {activeTab === "assinatura" && (
+              <div className="space-y-6">
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Minha Assinatura
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchSubscriptionData()}
+                      disabled={isLoadingSubscription}
+                    >
+                      {isLoadingSubscription ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Atualizar"
+                      )}
+                    </Button>
+                  </div>
+
+                  {isLoadingSubscription && !subscriptionData ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : !subscriptionData?.hasSubscription ? (
+                    <div className="text-center py-8 space-y-4">
+                      <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
+                      <div>
+                        <p className="font-medium mb-2">Você não possui uma assinatura ativa</p>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Assine um plano para ter acesso a recursos exclusivos
+                        </p>
+                      </div>
+                      <Button asChild>
+                        <Link href="/planos">Ver Planos Disponíveis</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Status Card */}
+                      <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Status</span>
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              subscriptionData.subscription?.status === "active"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            }`}
+                          >
+                            {subscriptionData.subscription?.status === "active"
+                              ? "Ativo"
+                              : subscriptionData.subscription?.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Plano</span>
+                          <span className="font-semibold">
+                            {subscriptionData.subscription?.plan.title}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Valor Mensal</span>
+                          <span className="font-semibold">
+                            R$ {((subscriptionData.subscription?.plan.monthlyPrice || 0) / 100).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Início do período</span>
+                          <span className="font-medium">
+                            {subscriptionData.subscription?.currentPeriodStart &&
+                              new Date(subscriptionData.subscription.currentPeriodStart).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {subscriptionData.subscription?.cancelAtPeriodEnd
+                              ? "Acesso até"
+                              : "Próxima cobrança"}
+                          </span>
+                          <span className="font-medium">
+                            {subscriptionData.subscription?.currentPeriodEnd &&
+                              new Date(subscriptionData.subscription.currentPeriodEnd).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+
+                        {subscriptionData.subscription?.cancelAtPeriodEnd && (
+                          <div className="pt-3 border-t">
+                            <div className="flex items-start gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+                              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              <p>
+                                Sua assinatura foi cancelada e expirará no final do período.
+                                Você ainda tem acesso até a data informada acima.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Features */}
+                      {subscriptionData.subscription?.plan.features && 
+                       subscriptionData.subscription.plan.features.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-3">Recursos incluídos:</h4>
+                          <ul className="space-y-2">
+                            {subscriptionData.subscription.plan.features
+                              .filter((f) => f.available)
+                              .map((feature) => (
+                                <li key={feature.id} className="flex items-center gap-2 text-sm">
+                                  <Star className="h-4 w-4 text-primary" />
+                                  {feature.text}
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="space-y-3 pt-4 border-t">
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={handleOpenPortal}
+                          disabled={isProcessingAction}
+                        >
+                          {isProcessingAction ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Abrindo...
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Gerenciar Método de Pagamento
+                            </>
+                          )}
+                        </Button>
+
+                        {subscriptionData.subscription?.cancelAtPeriodEnd ? (
+                          <Button
+                            className="w-full"
+                            onClick={handleReactivateSubscription}
+                            disabled={isProcessingAction}
+                          >
+                            {isProcessingAction ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Reativando...
+                              </>
+                            ) : (
+                              "Reativar Assinatura"
+                            )}
+                          </Button>
+                        ) : (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                className="w-full"
+                                variant="destructive"
+                                disabled={isProcessingAction}
+                              >
+                                Cancelar Assinatura
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Sua assinatura será cancelada ao final do período atual.
+                                  Você continuará tendo acesso aos recursos até{" "}
+                                  {subscriptionData.subscription?.currentPeriodEnd &&
+                                    new Date(subscriptionData.subscription.currentPeriodEnd).toLocaleDateString("pt-BR")}
+                                  .
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={handleCancelSubscription}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Sim, Cancelar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          asChild
+                        >
+                          <Link href="/perfil/pagamentos">
+                            Ver Histórico de Pagamentos
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {activeTab === "configuracoes" && (

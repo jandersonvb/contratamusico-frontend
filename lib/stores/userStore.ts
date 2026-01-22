@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { fetchUserDataFromApi, loginRequest } from '@/api/auth';
-import { LoginCredentials, User, UserState } from '../types/user';
+import { updateUserApi } from '@/api/user';
+import { LoginCredentials, User, UserState, UpdateUserData } from '../types/user';
 
 export const useUserStore = create<UserState>()(
   devtools(
@@ -9,6 +10,7 @@ export const useUserStore = create<UserState>()(
       (set, get) => ({
         user: null,
         isLoading: false,
+        isUpdating: false,
         isLoggedIn: false,
         error: null,
 
@@ -70,9 +72,22 @@ export const useUserStore = create<UserState>()(
           set({ user, isLoggedIn: true, error: null }, false, 'user/setUser');
         },
 
+        // Atualizar dados do usuário
+        updateUser: async (data: UpdateUserData) => {
+          set({ isUpdating: true, error: null }, false, 'user/updateStart');
+          try {
+            const updatedUser = await updateUserApi(data);
+            set({ user: updatedUser, isUpdating: false }, false, 'user/updateSuccess');
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Erro ao atualizar usuário';
+            set({ error: message, isUpdating: false }, false, 'user/updateError');
+            throw error;
+          }
+        },
+
         logout: () => {
           localStorage.removeItem('token');
-          set({ user: null, error: null, isLoggedIn: false, isLoading: false }, false, 'user/logout');
+          set({ user: null, error: null, isLoggedIn: false, isLoading: false, isUpdating: false }, false, 'user/logout');
           
           // Opcional: Redirecionar via window ou router
           // window.location.href = '/login'; 

@@ -22,12 +22,17 @@ import {
   MapPin,
   Music,
   Play,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
-import { MusicianDetail } from "@/lib/musicianDetails";
+import { MusicianProfile } from "@/lib/types/musician";
+import { createBooking } from "@/api/booking";
+import { addFavorite, removeFavorite, isFavorite } from "@/api/favorite";
+import { useUserStore } from "@/lib/stores/userStore";
+import { useEffect } from "react";
 
 interface MusicianDetailClientProps {
-  musician: MusicianDetail;
+  musician: MusicianProfile;
 }
 
 /**
@@ -40,32 +45,90 @@ function getStarArray(rating: number) {
 }
 
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
+  const { isLoggedIn } = useUserStore();
   // State for contact form
   const [form, setForm] = useState({ date: "", eventType: "", message: "" });
   const [favorite, setFavorite] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      checkIfFavorite();
+    }
+  }, [isLoggedIn, musician.id]);
+
+  const checkIfFavorite = async () => {
+    try {
+      const isFav = await isFavorite(musician.id);
+      setFavorite(isFav);
+    } catch (error) {
+      // Silently fail
+    }
+  };
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmitContact = (e: React.FormEvent) => {
+  const handleSubmitContact = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isLoggedIn) {
+      toast.error("Você precisa estar logado para fazer uma solicitação");
+      return;
+    }
+
     if (!form.date || !form.eventType || !form.message) {
       toast.error("Preencha todos os campos");
       return;
     }
-    toast.success(
-      "Mensagem enviada com sucesso! O músico entrará em contato em breve."
-    );
-    setForm({ date: "", eventType: "", message: "" });
+
+    setIsSubmitting(true);
+
+    try {
+      await createBooking({
+        musicianProfileId: musician.id,
+        eventDate: form.date,
+        eventType: form.eventType,
+        message: form.message,
+      });
+
+      toast.success(
+        "Solicitação enviada com sucesso! O músico entrará em contato em breve."
+      );
+      setForm({ date: "", eventType: "", message: "" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao enviar solicitação';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const toggleFavorite = () => {
-    setFavorite((prev) => !prev);
-    if (favorite) {
-      toast.info("Removido dos favoritos");
-    } else {
-      toast.success("Adicionado aos favoritos");
+  const toggleFavorite = async () => {
+    if (!isLoggedIn) {
+      toast.error("Você precisa estar logado para favoritar");
+      return;
+    }
+
+    setIsTogglingFavorite(true);
+
+    try {
+      if (favorite) {
+        await removeFavorite(musician.id);
+        toast.info("Removido dos favoritos");
+        setFavorite(false);
+      } else {
+        await addFavorite(musician.id);
+        toast.success("Adicionado aos favoritos");
+        setFavorite(true);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar favorito';
+      toast.error(message);
+    } finally {
+      setIsTogglingFavorite(false);
     }
   };
 
@@ -96,8 +159,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               <div className="relative">
                 <Image
                   src={
-                    // If the musician has an avatar property in future data, use it
-                    musician.portfolio[0]?.image ||
+                    musician.portfolio[0]?.url ||
                     "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop"
                   }
                   alt={musician.name}
@@ -131,12 +193,12 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 {/* Location and tags */}
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4" /> {musician.location}
-                  {musician.tags.map((tag) => (
+                  {musician.genres.map((genre) => (
                     <span
-                      key={tag}
+                      key={genre.id}
                       className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-medium"
                     >
-                      {tag}
+                      {genre.name}
                     </span>
                   ))}
                 </div>
@@ -149,7 +211,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                   A partir de
                 </span>
                 <span className="text-2xl font-bold text-primary">
-                  R$ {musician.priceFrom.toFixed(0)}
+                  R$ {musician.priceFrom != null ? musician.priceFrom.toFixed(0) : '--'}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -161,6 +223,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 <Button
                   variant="outline"
                   onClick={toggleFavorite}
+                  disabled={isTogglingFavorite}
                   aria-label={
                     favorite
                       ? "Remover dos favoritos"
@@ -183,14 +246,14 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               </div>
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> {musician.events}+ eventos
+                  <Calendar className="h-4 w-4" /> {musician.eventsCount}+ eventos
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" /> Resp. em{" "}
-                  {musician.responseTime}
+                  {musician.responseTime || "N/A"}
                 </div>
                 <div className="flex items-center gap-1">
-                  <CheckCircle className="h-4 w-4" /> {musician.satisfaction}%
+                  <CheckCircle className="h-4 w-4" /> {musician.satisfactionRate || 0}%
                   satisfação
                 </div>
               </div>
@@ -204,11 +267,11 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
             {/* About */}
             <section>
               <h2 className="text-xl font-semibold mb-3">Sobre</h2>
-              {musician.about.map((paragraph, idx) => (
-                <p key={idx} className="text-sm text-muted-foreground mb-2">
-                  {paragraph}
+              {musician.bio && (
+                <p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">
+                  {musician.bio}
                 </p>
-              ))}
+              )}
             </section>
             {/* Portfolio */}
             <section>
@@ -219,20 +282,20 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                     key={idx}
                     className="bg-card border rounded-lg overflow-hidden flex flex-col"
                   >
-                    {item.type === "image" && (
+                    {item.type === "IMAGE" && (
                       <Image
-                        src={item.image}
-                        alt={item.title}
+                        src={item.url || ""}
+                        alt={item.title || "Portfolio item"}
                         width={600}
                         height={400}
                         className="h-40 w-full object-cover"
                       />
                     )}
-                    {item.type === "video" && (
+                    {item.type === "VIDEO" && (
                       <div className="relative h-40 w-full">
                         <Image
-                          src={item.image}
-                          alt={item.title}
+                          src={item.url || ""}
+                          alt={item.title || "Portfolio item"}
                           width={600}
                           height={400}
                           className="h-40 w-full object-cover"
@@ -242,7 +305,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         </div>
                       </div>
                     )}
-                    {item.type === "audio" && (
+                    {item.type === "AUDIO" && (
                       <div className="flex items-center gap-4 p-4">
                         <button
                           className="p-2 rounded-full bg-primary/10 text-primary"
@@ -320,16 +383,12 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <Image
-                          src={review.avatar}
-                          alt={review.name}
-                          width={40}
-                          height={40}
-                          className="rounded-full h-10 w-10 object-cover"
-                        />
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                          {review.clientName.charAt(0).toUpperCase()}
+                        </div>
                         <div>
                           <span className="font-medium text-sm">
-                            {review.name}
+                            {review.clientName}
                           </span>
                           <div className="text-xs text-muted-foreground">
                             {review.date}
@@ -437,8 +496,17 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  Enviar Mensagem
+                <Button type="submit" className="w-full" disabled={isSubmitting || !isLoggedIn}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : !isLoggedIn ? (
+                    "Faça login para solicitar"
+                  ) : (
+                    "Enviar Solicitação"
+                  )}
                 </Button>
               </form>
             </div>
@@ -461,41 +529,14 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 <span className="text-muted-foreground">Disponibilidade</span>
                 <span>{musician.availability}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Área de Atuação</span>
-                <span>{musician.area}</span>
-              </div>
+              {musician.location && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Localização</span>
+                  <span>{musician.location}</span>
+                </div>
+              )}
             </div>
-            {/* Similar Musicians */}
-            <div className="bg-card border rounded-lg p-6">
-              <h3 className="font-semibold mb-4">Músicos Similares</h3>
-              <div className="space-y-4">
-                {musician.similar.map((sm) => (
-                  <div key={sm.id} className="flex items-center gap-3">
-                    <Image
-                      src={sm.image}
-                      alt={sm.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full h-10 w-10 object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{sm.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {sm.category}
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Star
-                        className="h-3 w-3 text-yellow-400"
-                        fill="currentColor"
-                      />
-                      {sm.rating.toFixed(1)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Similar Musicians - TODO: Implementar busca de músicos similares */}
           </aside>
         </div>
       </section>

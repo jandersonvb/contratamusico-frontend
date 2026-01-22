@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Calendar, Clock, MapPin, Mail } from "lucide-react";
-import type { Musician } from "@/lib/musicians";
+import { Heart, Calendar, Clock, MapPin, Mail, User } from "lucide-react";
+import type { MusicianListItem } from "@/lib/types/musician";
 
 interface MusicianCardProps {
-  musician: Musician;
+  musician: MusicianListItem;
   /**
    * When set to "list" the card renders horizontally instead of
    * vertically. This prop allows the results area to switch
@@ -25,6 +25,12 @@ interface MusicianCardProps {
  * list layouts depending on the `view` prop.
  */
 export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
+  // Combina gêneros e instrumentos para as tags
+  const tags = [
+    ...musician.genres.map((g) => g.name),
+    ...musician.instruments.map((i) => i.name),
+  ].slice(0, 4);
+
   return (
     <Card
       className={
@@ -37,16 +43,14 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
       <div
         className={
           view === "list"
-            ? "relative w-40 h-40 flex-shrink-0"
-            : "relative w-full aspect-square"
+            ? "relative w-40 h-40 flex-shrink-0 rounded-lg overflow-hidden bg-muted"
+            : "relative w-full aspect-square bg-muted"
         }
       >
-        <Image
-          src={musician.image}
-          alt={musician.name}
-          fill
-          className="object-cover"
-        />
+        {/* Placeholder com ícone de usuário (futuramente pode ter imagem) */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <User className="h-16 w-16 text-muted-foreground/50" />
+        </div>
         {/* Rating badge */}
         <Badge className="absolute top-2 left-2 text-xs">
           ⭐ {musician.rating.toFixed(1)}
@@ -60,13 +64,18 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         >
           <Heart className="h-4 w-4" />
         </Button>
+        {musician.isFeatured && (
+          <Badge className="absolute bottom-2 left-2 text-xs bg-amber-500 hover:bg-amber-600">
+            Destaque
+          </Badge>
+        )}
       </div>
       {/* Content */}
       <div className="p-4 flex flex-col flex-1 space-y-2">
         <h3 className="font-semibold text-lg leading-tight">{musician.name}</h3>
-        <p className="text-sm text-muted-foreground">{musician.category}</p>
+        <p className="text-sm text-muted-foreground">{musician.category || "Músico"}</p>
         <div className="flex flex-wrap gap-2">
-          {musician.tags.map((tag) => (
+          {tags.map((tag) => (
             <Badge
               key={tag}
               variant="secondary"
@@ -81,16 +90,22 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         </p>
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" /> {musician.events}+ eventos
+            <Calendar className="h-4 w-4" /> {musician.eventsCount}+ eventos
           </span>
-          <span className="flex items-center gap-1">
-            <Clock className="h-4 w-4" /> Resp. em {musician.responseTime}
-          </span>
+          {musician.ratingCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-4 w-4" /> {musician.ratingCount} avaliações
+            </span>
+          )}
         </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-xs text-muted-foreground">A partir de</span>
-          <span className="text-base font-semibold">R$ {musician.price}</span>
-        </div>
+        {musician.priceFrom && (
+          <div className="flex items-baseline gap-1">
+            <span className="text-xs text-muted-foreground">A partir de</span>
+            <span className="text-base font-semibold">
+              R$ {musician.priceFrom.toLocaleString("pt-BR")}
+            </span>
+          </div>
+        )}
         <div className="mt-auto flex gap-2">
           <Button size="sm" asChild>
             <Link href={`/musico/${musician.id}`}>Ver Perfil</Link>

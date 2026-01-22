@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -26,24 +27,14 @@ import {
   Star,
   X,
 } from "lucide-react";
-
-// Define the shape of our filter state. In a real app this would likely
-// live in the parent page component and be passed into this component.
-interface Filters {
-  city: string;
-  state: string;
-  instruments: string[];
-  genres: string[];
-  priceMin: string;
-  priceMax: string;
-  rating: string;
-  date: string;
-  availability: string[];
-}
+import { useLocationStore } from "@/lib/stores/locationStore";
+import { useInstrumentStore } from "@/lib/stores/instrumentStore";
+import { useGenreStore } from "@/lib/stores/genreStore";
+import { SearchFilters as SearchFiltersType } from "@/lib/types/search";
 
 interface SearchFiltersProps {
-  filters: Filters;
-  setFilters: (filters: Filters) => void;
+  filters: SearchFiltersType;
+  setFilters: (filters: SearchFiltersType) => void;
   clearFilters: () => void;
 }
 
@@ -58,13 +49,33 @@ export function SearchFilters({
   setFilters,
   clearFilters,
 }: SearchFiltersProps) {
+  // Stores
+  const { states, cities, isLoadingStates, isLoadingCities, fetchStates, fetchCities } = useLocationStore();
+  const { instruments, isLoading: isLoadingInstruments, fetchInstruments } = useInstrumentStore();
+  const { genres, isLoading: isLoadingGenres, fetchGenres } = useGenreStore();
+
+  // Carrega dados iniciais
+  useEffect(() => {
+    fetchStates();
+    fetchInstruments();
+    fetchGenres();
+  }, [fetchStates, fetchInstruments, fetchGenres]);
+
+  // Quando o estado muda, busca as cidades
+  useEffect(() => {
+    if (filters.state && filters.state !== "all") {
+      fetchCities(filters.state);
+    }
+  }, [filters.state, fetchCities]);
+
   // Helper to toggle a value inside an array filter (instruments, genres, availability)
-  const toggleArrayValue = (key: keyof Filters, value: string) => {
+  const toggleArrayValue = (key: keyof SearchFiltersType, value: string) => {
+    const currentArray = filters[key] as string[];
     setFilters({
       ...filters,
-      [key]: filters[key].includes(value)
-        ? (filters[key] as string[]).filter((v) => v !== value)
-        : [...(filters[key] as string[]), value],
+      [key]: currentArray.includes(value)
+        ? currentArray.filter((v) => v !== value)
+        : [...currentArray, value],
     });
   };
 
@@ -99,40 +110,51 @@ export function SearchFilters({
             <MapPin className="h-4 w-4" /> Localização
           </AccordionTrigger>
           <AccordionContent className="space-y-2 pt-2">
-            <Input
-              placeholder="Cidade"
-              value={filters.city}
-              onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-            />
             <Select
               value={filters.state}
-              onValueChange={(value) =>
-                setFilters({ ...filters, state: value })
-              }
+              onValueChange={(value) => {
+                setFilters({ ...filters, state: value, city: "" });
+              }}
             >
               <SelectTrigger className="w-full">
-                {filters.state ? filters.state : "Todos os estados"}
+                {isLoadingStates 
+                  ? "Carregando..." 
+                  : filters.state && filters.state !== "all"
+                    ? states.find(s => s.sigla === filters.state)?.nome || filters.state
+                    : "Todos os estados"
+                }
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os estados</SelectItem>
-                {[
-                  { value: "SP", label: "São Paulo" },
-                  { value: "RJ", label: "Rio de Janeiro" },
-                  { value: "MG", label: "Minas Gerais" },
-                  { value: "RS", label: "Rio Grande do Sul" },
-                  { value: "PR", label: "Paraná" },
-                  { value: "SC", label: "Santa Catarina" },
-                  { value: "BA", label: "Bahia" },
-                  { value: "GO", label: "Goiás" },
-                  { value: "PE", label: "Pernambuco" },
-                  { value: "CE", label: "Ceará" },
-                ].map((state) => (
-                  <SelectItem key={state.value} value={state.value}>
-                    {state.label}
+                {states.map((state) => (
+                  <SelectItem key={state.sigla} value={state.sigla}>
+                    {state.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            
+            {filters.state && filters.state !== "all" && (
+              <Select
+                value={filters.city || "all"}
+                onValueChange={(value) => setFilters({ ...filters, city: value === "all" ? "" : value })}
+              >
+                <SelectTrigger className="w-full">
+                  {isLoadingCities
+                    ? "Carregando..."
+                    : filters.city || "Todas as cidades"
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as cidades</SelectItem>
+                  {cities.map((city) => (
+                    <SelectItem key={city.id} value={city.nome}>
+                      {city.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </AccordionContent>
         </AccordionItem>
 
@@ -142,32 +164,27 @@ export function SearchFilters({
             <Guitar className="h-4 w-4" /> Instrumentos
           </AccordionTrigger>
           <AccordionContent className="pt-2">
-            <div className="flex flex-col gap-2">
-              {[
-                { value: "violao", label: "Violão" },
-                { value: "guitarra", label: "Guitarra" },
-                { value: "piano", label: "Piano" },
-                { value: "teclado", label: "Teclado" },
-                { value: "bateria", label: "Bateria" },
-                { value: "baixo", label: "Baixo" },
-                { value: "vocal", label: "Vocal" },
-                { value: "saxofone", label: "Saxofone" },
-              ].map((instrument) => (
-                <Label
-                  key={instrument.value}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <Checkbox
-                    id={`instruments-${instrument.value}`}
-                    checked={filters.instruments.includes(instrument.value)}
-                    onCheckedChange={() =>
-                      toggleArrayValue("instruments", instrument.value)
-                    }
-                  />
-                  <span>{instrument.label}</span>
-                </Label>
-              ))}
-            </div>
+            {isLoadingInstruments ? (
+              <p className="text-sm text-muted-foreground">Carregando...</p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                {instruments.map((instrument) => (
+                  <Label
+                    key={instrument.slug}
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                  >
+                    <Checkbox
+                      id={`instruments-${instrument.slug}`}
+                      checked={filters.instruments.includes(instrument.slug)}
+                      onCheckedChange={() =>
+                        toggleArrayValue("instruments", instrument.slug)
+                      }
+                    />
+                    <span>{instrument.name}</span>
+                  </Label>
+                ))}
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
 
@@ -177,32 +194,27 @@ export function SearchFilters({
             <Music className="h-4 w-4" /> Estilos Musicais
           </AccordionTrigger>
           <AccordionContent className="pt-2">
-            <div className="flex flex-col gap-2">
-              {[
-                { value: "mpb", label: "MPB" },
-                { value: "rock", label: "Rock" },
-                { value: "pop", label: "Pop" },
-                { value: "jazz", label: "Jazz" },
-                { value: "classica", label: "Clássica" },
-                { value: "sertanejo", label: "Sertanejo" },
-                { value: "bossa-nova", label: "Bossa Nova" },
-                { value: "eletronica", label: "Eletrônica" },
-              ].map((genre) => (
-                <Label
-                  key={genre.value}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <Checkbox
-                    id={`genres-${genre.value}`}
-                    checked={filters.genres.includes(genre.value)}
-                    onCheckedChange={() =>
-                      toggleArrayValue("genres", genre.value)
-                    }
-                  />
-                  <span>{genre.label}</span>
-                </Label>
-              ))}
-            </div>
+            {isLoadingGenres ? (
+              <p className="text-sm text-muted-foreground">Carregando...</p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                {genres.map((genre) => (
+                  <Label
+                    key={genre.slug}
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                  >
+                    <Checkbox
+                      id={`genres-${genre.slug}`}
+                      checked={filters.genres.includes(genre.slug)}
+                      onCheckedChange={() =>
+                        toggleArrayValue("genres", genre.slug)
+                      }
+                    />
+                    <span>{genre.name}</span>
+                  </Label>
+                ))}
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
 
@@ -238,7 +250,7 @@ export function SearchFilters({
                 { min: "300", max: "500", label: "R$ 300 - R$ 500" },
                 { min: "500", max: "800", label: "R$ 500 - R$ 800" },
                 { min: "800", max: "1200", label: "R$ 800 - R$ 1.200" },
-                { min: "1200", max: "9999", label: "R$ 1.200+" },
+                { min: "1200", max: "", label: "R$ 1.200+" },
               ].map((preset, idx) => (
                 <Button
                   key={idx}

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
+import { useEffect, useCallback } from "react";
 import { Pagination } from "./components/Pagination";
-
 import {
   Select,
   SelectContent,
@@ -12,54 +10,105 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Grid, List, Search } from "lucide-react";
-import { musicians, type Musician } from "@/lib/musicians";
+import { Grid, List, Search, Loader2 } from "lucide-react";
 import { SearchFilters } from "./components/SearchFilters";
 import { MusicianCard } from "./components/MusicianCard";
-
-// Define the shape of our filter state. This mirrors the structure
-// described in SearchFilters.tsx. In a production app these would
-// likely live in a shared store (e.g. Zustand) or be derived from
-// query parameters.
-interface Filters {
-  city: string;
-  state: string;
-  instruments: string[];
-  genres: string[];
-  priceMin: string;
-  priceMax: string;
-  rating: string;
-  date: string;
-  availability: string[];
-}
-
-const defaultFilters: Filters = {
-  city: "",
-  state: "",
-  instruments: [],
-  genres: [],
-  priceMin: "",
-  priceMax: "",
-  rating: "",
-  date: "",
-  availability: [],
-};
+import { useSearchStore } from "@/lib/stores/searchStore";
+import { useLocationStore } from "@/lib/stores/locationStore";
+import { useInstrumentStore } from "@/lib/stores/instrumentStore";
+import { useGenreStore } from "@/lib/stores/genreStore";
+import { defaultFilters } from "@/lib/types/search";
 
 export default function SearchPage() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState("relevance");
-  const [currentPage, setCurrentPage] = useState(1);
+  // Search Store
+  const {
+    filters,
+    setFilters,
+    clearFilters,
+    musicians,
+    pagination,
+    isLoading,
+    error,
+    sortBy,
+    setSortBy,
+    view,
+    setView,
+    search,
+  } = useSearchStore();
 
-  // Reset filters to defaults
-  const clearFilters = () => setFilters(defaultFilters);
+  // Stores para labels dos badges
+  const { states } = useLocationStore();
+  const { instruments } = useInstrumentStore();
+  const { genres } = useGenreStore();
 
-  // In a real implementation you would filter and sort your data
-  // based on the current filters and sortBy state. For now we just
-  // return the full list of musicians.
-  const filteredMusicians: Musician[] = musicians;
+  // Busca inicial e quando filtros mudam
+  const performSearch = useCallback(() => {
+    search();
+  }, [search]);
 
-  const totalPages = 1; // Pagination not implemented yet
+  // Busca inicial ao montar o componente
+  useEffect(() => {
+    performSearch();
+  }, []);
+
+  // Handler para mudança de filtros (com debounce implícito ao clicar em "Buscar")
+  const handleFiltersChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+  };
+
+  // Handler para limpar filtros
+  const handleClearFilters = () => {
+    clearFilters();
+    // Busca novamente após limpar
+    setTimeout(() => search(), 0);
+  };
+
+  // Handler para busca textual
+  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFilters({ search: e.target.value });
+  };
+
+  // Handler para submit da busca
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    performSearch();
+  };
+
+  // Handler para mudança de ordenação
+  const handleSortChange = (value: string) => {
+    setSortBy(value);
+    setTimeout(() => search(), 0);
+  };
+
+  // Handler para mudança de página
+  const handlePageChange = (page: number) => {
+    useSearchStore.setState((state) => ({
+      pagination: state.pagination ? { ...state.pagination, page } : null,
+    }));
+    setTimeout(() => search(), 0);
+  };
+
+  // Helper para obter o nome do instrumento pelo slug
+  const getInstrumentName = (slug: string) => {
+    const instrument = instruments.find((i) => i.slug === slug);
+    return instrument?.name || slug;
+  };
+
+  // Helper para obter o nome do gênero pelo slug
+  const getGenreName = (slug: string) => {
+    const genre = genres.find((g) => g.slug === slug);
+    return genre?.name || slug;
+  };
+
+  // Helper para obter o nome do estado pela sigla
+  const getStateName = (sigla: string) => {
+    const state = states.find((s) => s.sigla === sigla);
+    return state?.nome || sigla;
+  };
+
+  const currentPage = pagination?.page || 1;
+  const totalPages = pagination?.totalPages || 1;
+  const totalResults = pagination?.total || 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -70,24 +119,34 @@ export default function SearchPage() {
           <p className="text-muted-foreground max-w-xl mx-auto">
             Use nossos filtros para encontrar o músico perfeito para seu evento
           </p>
-          <div className="mx-auto max-w-xl flex items-center gap-2">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="mx-auto max-w-xl flex items-center gap-2"
+          >
             <input
               type="text"
               placeholder="Buscar por nome, instrumento ou estilo..."
+              value={filters.search}
+              onChange={handleSearchInput}
               className="flex-1 rounded-md border px-4 py-2 focus:outline-none focus:ring ring-primary"
             />
-            <Button size="icon" variant="default" aria-label="Pesquisar">
-              <Search className="h-4 w-4" />
+            <Button type="submit" size="icon" variant="default" aria-label="Pesquisar">
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
             </Button>
-          </div>
+          </form>
         </div>
       </section>
+
       {/* Main content */}
       <section className="container mx-auto px-4 flex-1 py-8 flex flex-col lg:flex-row gap-8">
         <SearchFilters
           filters={filters}
-          setFilters={setFilters}
-          clearFilters={clearFilters}
+          setFilters={handleFiltersChange}
+          clearFilters={handleClearFilters}
         />
         <div className="flex-1 flex flex-col">
           {/* Results header and controls */}
@@ -95,15 +154,23 @@ export default function SearchPage() {
             <div>
               <h2 className="text-2xl font-semibold">Músicos Encontrados</h2>
               <span className="text-sm text-muted-foreground">
-                {filteredMusicians.length} músicos encontrados
+                {isLoading ? "Buscando..." : `${totalResults} músicos encontrados`}
               </span>
             </div>
             <div className="flex items-center gap-4">
+              <Button onClick={performSearch} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  "Aplicar Filtros"
+                )}
+              </Button>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Ordenar por:
-                </span>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <span className="text-sm text-muted-foreground">Ordenar por:</span>
+                <Select value={sortBy} onValueChange={handleSortChange}>
                   <SelectTrigger className="w-40">
                     {(() => {
                       switch (sortBy) {
@@ -113,8 +180,6 @@ export default function SearchPage() {
                           return "Menor Preço";
                         case "price-high":
                           return "Maior Preço";
-                        case "distance":
-                          return "Distância";
                         case "newest":
                           return "Mais Recentes";
                         default:
@@ -123,11 +188,9 @@ export default function SearchPage() {
                     })()}
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="relevance">Relevância</SelectItem>
                     <SelectItem value="rating">Melhor Avaliação</SelectItem>
                     <SelectItem value="price-low">Menor Preço</SelectItem>
                     <SelectItem value="price-high">Maior Preço</SelectItem>
-                    <SelectItem value="distance">Distância</SelectItem>
                     <SelectItem value="newest">Mais Recentes</SelectItem>
                   </SelectContent>
                 </Select>
@@ -153,28 +216,35 @@ export default function SearchPage() {
               </div>
             </div>
           </div>
+
           {/* Active filters chips */}
           <div className="flex flex-wrap gap-2 mb-4">
             {filters.city && (
               <Badge variant="secondary">Cidade: {filters.city}</Badge>
             )}
-            {filters.state && (
-              <Badge variant="secondary">Estado: {filters.state}</Badge>
+            {filters.state && filters.state !== "all" && (
+              <Badge variant="secondary">Estado: {getStateName(filters.state)}</Badge>
             )}
-            {filters.instruments.map((instr) => (
-              <Badge key={instr} variant="secondary">
-                {instr}
+            {filters.instruments.map((slug) => (
+              <Badge key={slug} variant="secondary">
+                {getInstrumentName(slug)}
               </Badge>
             ))}
-            {filters.genres.map((genre) => (
-              <Badge key={genre} variant="secondary">
-                {genre}
+            {filters.genres.map((slug) => (
+              <Badge key={slug} variant="secondary">
+                {getGenreName(slug)}
               </Badge>
             ))}
             {filters.priceMin && filters.priceMax && (
               <Badge variant="secondary">
                 Faixa: R$ {filters.priceMin} - R$ {filters.priceMax}
               </Badge>
+            )}
+            {filters.priceMin && !filters.priceMax && (
+              <Badge variant="secondary">A partir de R$ {filters.priceMin}</Badge>
+            )}
+            {filters.priceMax && !filters.priceMin && (
+              <Badge variant="secondary">Até R$ {filters.priceMax}</Badge>
             )}
             {filters.rating && (
               <Badge variant="secondary">Nota: {filters.rating}+</Badge>
@@ -192,30 +262,68 @@ export default function SearchPage() {
               </Badge>
             ))}
           </div>
-          {/* Results list */}
-          {view === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMusicians.map((musician) => (
-                <MusicianCard key={musician.id} musician={musician} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filteredMusicians.map((musician) => (
-                <MusicianCard
-                  key={musician.id}
-                  musician={musician}
-                  view="list"
-                />
-              ))}
+
+          {/* Error message */}
+          {error && (
+            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg mb-4">
+              {error}
             </div>
           )}
+
+          {/* Loading state */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && musicians.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                Nenhum músico encontrado com os filtros selecionados.
+              </p>
+              <Button
+                variant="link"
+                onClick={handleClearFilters}
+                className="mt-2"
+              >
+                Limpar filtros
+              </Button>
+            </div>
+          )}
+
+          {/* Results list */}
+          {!isLoading && musicians.length > 0 && (
+            <>
+              {view === "grid" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {musicians.map((musician) => (
+                    <MusicianCard key={musician.id} musician={musician} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {musicians.map((musician) => (
+                    <MusicianCard
+                      key={musician.id}
+                      musician={musician}
+                      view="list"
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           {/* Pagination */}
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
         </div>
       </section>
     </div>

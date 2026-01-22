@@ -15,7 +15,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User2, LayoutGrid, LogOut } from "lucide-react";
+import { User2, LayoutGrid, LogOut, Heart, MessageCircle } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
 
 // Util: pega iniciais e encurta e-mail
@@ -83,11 +83,24 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
 
-        {/* Se quiser um link “Meus Designs” como no QR Midia, troque a rota abaixo */}
         <DropdownMenuItem asChild className="gap-2">
           <Link href="/dashboard" className="flex items-center">
             <LayoutGrid className="h-4 w-4" />
-            <span>Meus Painéis</span>
+            <span>Dashboard</span>
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem asChild className="gap-2">
+          <Link href="/mensagens" className="flex items-center">
+            <MessageCircle className="h-4 w-4" />
+            <span>Mensagens</span>
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem asChild className="gap-2">
+          <Link href="/favoritos" className="flex items-center">
+            <Heart className="h-4 w-4" />
+            <span>Favoritos</span>
           </Link>
         </DropdownMenuItem>
 

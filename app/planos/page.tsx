@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -10,23 +10,70 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { musicianPlans, clientPlans, planFaq } from "@/lib/plans";
-import { Check, X, Star as StarIcon } from "lucide-react";
+import { planFaq } from "@/lib/plans";
+import { Check, X, Star as StarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { getPlans, createCheckoutSession } from "@/api";
+import type { Plan } from "@/api/plan";
+import { toast } from "sonner";
+import { useUserStore } from "@/lib/stores/userStore";
+import { useRouter } from "next/navigation";
 
-/**
- * Pricing page that showcases subscription plans for musicians and clients.
- * Users can toggle between categories and monthly or yearly billing. Each
- * plan displays its features and a call‑to‑action button. An FAQ
- * accordion answers common questions and a final call‑to‑action invites
- * users to sign up or contact sales.
- */
+
 export default function PlanosPage() {
-  const [category, setCategory] = useState<"musicians" | "clients">(
-    "musicians"
-  );
+  const router = useRouter();
+  const { isLoggedIn } = useUserStore();
+  const [category, setCategory] = useState<"musician" | "client">("musician");
   const [annual, setAnnual] = useState(false);
-  const plans = category === "musicians" ? musicianPlans : clientPlans;
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingPlanId, setProcessingPlanId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [category]);
+
+  const fetchPlans = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getPlans(category);
+      setPlans(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubscribe = async (plan: Plan) => {
+    if (!isLoggedIn) {
+      toast.error("Você precisa estar logado para assinar um plano");
+      router.push("/login");
+      return;
+    }
+
+    if (plan.monthlyPrice === 0) {
+      toast.info("Plano gratuito - não requer pagamento");
+      return;
+    }
+
+    setProcessingPlanId(plan.id);
+
+    try {
+      const { checkoutUrl } = await createCheckoutSession({
+        planId: plan.id,
+        billingInterval: annual ? 'yearly' : 'monthly',
+      });
+
+      // Redireciona para o checkout do Stripe
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao processar pagamento';
+      toast.error(message);
+      setProcessingPlanId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -42,14 +89,14 @@ export default function PlanosPage() {
           </p>
           <div className="flex justify-center gap-4 flex-wrap">
             <Button
-              variant={category === "musicians" ? "default" : "outline"}
-              onClick={() => setCategory("musicians")}
+              variant={category === "musician" ? "default" : "outline"}
+              onClick={() => setCategory("musician")}
             >
               Para Músicos
             </Button>
             <Button
-              variant={category === "clients" ? "default" : "outline"}
-              onClick={() => setCategory("clients")}
+              variant={category === "client" ? "default" : "outline"}
+              onClick={() => setCategory("client")}
             >
               Para Clientes
             </Button>
@@ -73,63 +120,84 @@ export default function PlanosPage() {
       {/* Plans section */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map((plan) => {
-              const price = annual ? plan.yearly : plan.monthly;
-              return (
-                <div
-                  key={plan.id}
-                  className={`relative bg-card border rounded-lg p-6 flex flex-col ${
-                    plan.badge ? "ring-2 ring-primary" : ""
-                  }`}
-                >
-                  {plan.badge && (
-                    <span className="absolute top-0 right-0 mt-2 mr-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded">
-                      {plan.badge}
-                    </span>
-                  )}
-                  <h3 className="text-xl font-semibold mb-1">{plan.title}</h3>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-3xl font-bold text-primary">
-                      {price === 0 ? "R$ 0" : `R$ ${price}`}
-                    </span>
-                    {price !== 0 && <span className="text-sm">/mês</span>}
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-4 min-h-[48px]">
-                    {plan.description}
-                  </p>
-                  <ul className="space-y-2 flex-1 mb-6">
-                    {plan.features.map((feature, idx) => (
-                      <li
-                        key={idx}
-                        className={`flex items-center gap-2 text-sm ${
-                          feature.available
-                            ? ""
-                            : "text-muted-foreground line-through"
-                        }`}
-                      >
-                        {feature.available ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <X className="h-4 w-4 text-red-500" />
-                        )}
-                        {feature.text}
-                        {feature.highlight && (
-                          <StarIcon className="h-4 w-4 text-yellow-400" />
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className="w-full mt-auto"
-                    variant={plan.monthly === 0 ? "outline" : "default"}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8">
+              {plans.map((plan) => {
+                const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
+                const formattedPrice = price === 0 
+                  ? "R$ 0" 
+                  : `R$ ${(price / 100).toFixed(2).replace('.', ',')}`;
+                const isProcessing = processingPlanId === plan.id;
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative bg-card border rounded-lg p-6 flex flex-col ${
+                      plan.badge ? "ring-2 ring-primary" : ""
+                    }`}
                   >
-                    {plan.cta}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+                    {plan.badge && (
+                      <span className="absolute top-0 right-0 mt-2 mr-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded">
+                        {plan.badge}
+                      </span>
+                    )}
+                    <h3 className="text-xl font-semibold mb-1">{plan.title}</h3>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-3xl font-bold text-primary">
+                        {formattedPrice}
+                      </span>
+                      {price !== 0 && <span className="text-sm">/mês</span>}
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4 min-h-[48px]">
+                      {plan.description}
+                    </p>
+                    <ul className="space-y-2 flex-1 mb-6">
+                      {plan.features.map((feature) => (
+                        <li
+                          key={feature.id}
+                          className={`flex items-center gap-2 text-sm ${
+                            feature.available
+                              ? ""
+                              : "text-muted-foreground line-through"
+                          }`}
+                        >
+                          {feature.available ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <X className="h-4 w-4 text-red-500" />
+                          )}
+                          {feature.text}
+                          {feature.highlight && (
+                            <StarIcon className="h-4 w-4 text-yellow-400" />
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      className="w-full mt-auto"
+                      variant={plan.monthlyPrice === 0 ? "outline" : "default"}
+                      onClick={() => handleSubscribe(plan)}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : plan.monthlyPrice === 0 ? (
+                        "Começar Grátis"
+                      ) : (
+                        "Assinar Agora"
+                      )}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
       {/* FAQ section */}
