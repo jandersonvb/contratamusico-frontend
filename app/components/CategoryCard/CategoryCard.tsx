@@ -15,9 +15,9 @@ export function CategoryCard({ item }: { item: Category }) {
         </div>
         <h3 className="text-xl font-semibold">{item.title}</h3>
         <p className="text-sm text-muted-foreground">{item.blurb}</p>
-        <Button asChild variant="ghost" size="sm">
+        {/* <Button asChild variant="ghost" size="sm">
           <Link href={item.href}>Ver {item.title.split(" ")[0]}</Link>
-        </Button>
+        </Button> */}
       </CardContent>
     </Card>
   );

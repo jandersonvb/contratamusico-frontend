@@ -7,6 +7,7 @@ import { Instrument } from './instrument';
 export interface MusicianListItem {
   id: number;
   name: string;
+  profileImageUrl?: string | null;
   category: string | null;
   location: string;
   priceFrom: number | null;
@@ -49,6 +50,7 @@ export interface MusicianProfile {
   name: string;
   email: string;
   phone: string | null;
+  profileImageUrl?: string | null;
   category: string | null;
   bio: string | null;
   location: string;

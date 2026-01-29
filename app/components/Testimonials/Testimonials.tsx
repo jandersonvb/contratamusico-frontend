@@ -6,8 +6,8 @@ const testimonials = [
     id: 1,
     quote:
       "Encontrei o músico perfeito para meu casamento. A contratação foi super fácil e o resultado superou as expectativas.",
-    name: "Mariana Souza",
-    role: "Noiva",
+    name: "João da Silva",
+    role: "Cantor",
     avatar:
       "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=128&q=80&auto=format&fit=crop",
   },
@@ -15,8 +15,8 @@ const testimonials = [
     id: 2,
     quote:
       "Usei a plataforma para um evento corporativo e foi um sucesso. O suporte ao longo do processo foi excelente.",
-    name: "Carlos Silva",
-    role: "Gerente de eventos",
+    name: "Rebeca Oliveira",
+    role: "Violonista",
     avatar:
       "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=128&q=80&auto=format&fit=crop",
   },
@@ -24,8 +24,8 @@ const testimonials = [
     id: 3,
     quote:
       "Como contratante frequente, adoro a curadoria de profissionais e a transparência nos perfis.",
-    name: "Fernanda Lima",
-    role: "Produtora",
+    name: "Caio Oliveira",
+    role: "Empresário",
     avatar:
       "https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=128&q=80&auto=format&fit=crop",
   },

@@ -45,6 +45,16 @@ function getStarArray(rating: number) {
 
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
   const { isLoggedIn } = useUserStore();
+  
+  // Debug: Log do que está vindo do backend
+  console.log('🎵 Musician Profile:', {
+    id: musician.id,
+    name: musician.name,
+    profileImageUrl: musician.profileImageUrl,
+    hasPortfolio: musician.portfolio?.length > 0,
+    firstPortfolioItem: musician.portfolio?.[0]
+  });
+  
   // State for contact form
   const [form, setForm] = useState({ date: "", eventType: "", message: "" });
   const [favorite, setFavorite] = useState(false);
@@ -158,8 +168,9 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               <div className="relative">
                 <Image
                   src={
-                    musician.portfolio[0]?.url ||
-                    "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=200&h=200&fit=crop"
+                    musician.profileImageUrl ||
+                    (musician.portfolio && musician.portfolio.length > 0 && musician.portfolio[0].type === 'IMAGE' && musician.portfolio[0].url) ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(musician.name)}&size=200&background=random&color=fff`
                   }
                   alt={musician.name}
                   width={80}
@@ -192,7 +203,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 {/* Location and tags */}
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4" /> {musician.location}
-                  {musician.genres.map((genre) => (
+                  {musician.genres && musician.genres.length > 0 && musician.genres.map((genre) => (
                     <span
                       key={genre.id}
                       className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-medium"
@@ -245,7 +256,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               </div>
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> {musician.eventsCount}+ eventos
+                  <Calendar className="h-4 w-4" /> {musician.eventsCount || 0}+ eventos
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" /> Resp. em{" "}
@@ -266,44 +277,49 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
             {/* About */}
             <section>
               <h2 className="text-xl font-semibold mb-3">Sobre</h2>
-              {musician.bio && (
+              {musician.bio ? (
                 <p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">
                   {musician.bio}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Nenhuma biografia disponível.
                 </p>
               )}
             </section>
             {/* Portfolio */}
             <section>
               <h2 className="text-xl font-semibold mb-3">Portfólio</h2>
-              <div className="grid sm:grid-cols-2 gap-6">
-                {musician.portfolio.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-card border rounded-lg overflow-hidden flex flex-col"
-                  >
-                    {item.type === "IMAGE" && (
-                      <Image
-                        src={item.url || ""}
-                        alt={item.title || "Portfolio item"}
-                        width={600}
-                        height={400}
-                        className="h-40 w-full object-cover"
-                      />
-                    )}
-                    {item.type === "VIDEO" && (
-                      <div className="relative h-40 w-full">
+              {musician.portfolio && musician.portfolio.length > 0 ? (
+                <div className="grid sm:grid-cols-2 gap-6">
+                  {musician.portfolio.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-card border rounded-lg overflow-hidden flex flex-col"
+                    >
+                      {item.type === "IMAGE" && item.url && (
                         <Image
-                          src={item.url || ""}
+                          src={item.url}
                           alt={item.title || "Portfolio item"}
                           width={600}
                           height={400}
                           className="h-40 w-full object-cover"
                         />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                          <Play className="h-10 w-10 text-white" />
+                      )}
+                      {item.type === "VIDEO" && item.url && (
+                        <div className="relative h-40 w-full">
+                          <Image
+                            src={item.url}
+                            alt={item.title || "Portfolio item"}
+                            width={600}
+                            height={400}
+                            className="h-40 w-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <Play className="h-10 w-10 text-white" />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {item.type === "AUDIO" && (
                       <div className="flex items-center gap-4 p-4">
                         <button
@@ -348,6 +364,9 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                   </div>
                 ))}
               </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhum item no portfólio ainda.</p>
+              )}
             </section>
             {/* Reviews */}
             <section>
@@ -374,8 +393,10 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                   </span>
                 </div>
               </div>
-              <div className="space-y-6">
-                {musician.reviews.map((review) => (
+              {musician.reviews && musician.reviews.length > 0 ? (
+                <>
+                  <div className="space-y-6">
+                    {musician.reviews.map((review) => (
                   <div
                     key={review.id}
                     className="bg-card border rounded-lg p-4 space-y-3"
@@ -419,6 +440,10 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               <Button variant="outline" className="mt-4">
                 Ver Todas as Avaliações
               </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma avaliação ainda.</p>
+              )}
             </section>
           </div>
           {/* Sidebar */}
@@ -514,20 +539,30 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               <h3 className="font-semibold mb-4">Detalhes</h3>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Instrumentos</span>
-                <span>{musician.instruments.join(", ")}</span>
+                <span className="text-right">
+                  {musician.instruments.map((inst) => 
+                    typeof inst === 'string' ? inst : inst.name
+                  ).join(", ")}
+                </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Experiência</span>
-                <span>{musician.experience}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Equipamentos</span>
-                <span className="text-right">{musician.equipment}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Disponibilidade</span>
-                <span>{musician.availability}</span>
-              </div>
+              {musician.experience && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Experiência</span>
+                  <span className="text-right">{musician.experience}</span>
+                </div>
+              )}
+              {musician.equipment && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Equipamentos</span>
+                  <span className="text-right">{musician.equipment}</span>
+                </div>
+              )}
+              {musician.availability && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Disponibilidade</span>
+                  <span className="text-right">{musician.availability}</span>
+                </div>
+              )}
               {musician.location && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Localização</span>

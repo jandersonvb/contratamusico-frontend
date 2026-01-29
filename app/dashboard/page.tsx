@@ -15,26 +15,37 @@ export default function DashboardPage() {
   const { user, isLoggedIn, isLoading: userLoading } = useUserStore();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Garantir hidratação antes de verificar autenticação
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
-    if (!userLoading && !isLoggedIn) {
+    // Só redireciona após a hidratação estar completa
+    if (hydrated && !userLoading && !isLoggedIn) {
       router.push("/login");
     }
-  }, [isLoggedIn, userLoading, router]);
+  }, [hydrated, isLoggedIn, userLoading, router]);
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (hydrated && isLoggedIn) {
       fetchBookings();
+    } else if (hydrated && !isLoggedIn && !userLoading) {
+      // Se hidratado e não logado, para o loading
+      setIsLoadingBookings(false);
     }
-  }, [isLoggedIn]);
+  }, [hydrated, isLoggedIn, userLoading]);
 
   const fetchBookings = async () => {
     try {
       const data = await getMyBookings();
       setBookings(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao carregar contratações';
-      toast.error(message);
+      // Silenciosamente trata erros de booking vazio
+      console.error('Erro ao carregar bookings:', error);
+      setBookings([]); // Define como array vazio em caso de erro
     } finally {
       setIsLoadingBookings(false);
     }

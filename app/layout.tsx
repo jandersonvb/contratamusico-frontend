@@ -34,7 +34,7 @@ export default function RootLayout({
         <Navbar />
         {children}
         <Footer />
-        <Toaster richColors />
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

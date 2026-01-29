@@ -58,7 +58,10 @@ export async function searchMusicians(params: SearchMusiciansParams = {}): Promi
  * @param limit Número máximo de músicos (padrão: 6)
  */
 export async function fetchFeaturedMusicians(limit: number = 6): Promise<MusicianListItem[]> {
-  const response = await fetch(`${API_URL}/musicians/featured?limit=${limit}`);
+  // Garantir que limit é um número válido
+  const validLimit = !limit || isNaN(limit) || limit <= 0 ? 6 : limit;
+  
+  const response = await fetch(`${API_URL}/musicians/featured?limit=${validLimit}`);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
@@ -72,6 +75,11 @@ export async function fetchFeaturedMusicians(limit: number = 6): Promise<Musicia
  * Busca perfil completo de um músico por ID
  */
 export async function fetchMusicianById(id: number): Promise<MusicianProfile> {
+  // Validar que o ID é um número válido
+  if (!id || isNaN(id) || id <= 0) {
+    throw new Error('ID do músico inválido');
+  }
+
   const response = await fetch(`${API_URL}/musicians/${id}`);
 
   if (!response.ok) {

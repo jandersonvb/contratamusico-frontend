@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -53,6 +53,12 @@ export function UserMenu() {
           aria-label="Menu do usuário"
         >
           <Avatar className="h-9 w-9">
+            {user?.profileImageUrl && (
+              <AvatarImage 
+                src={user.profileImageUrl} 
+                alt={`${user.firstName} ${user.lastName}`}
+              />
+            )}
             <AvatarFallback className="text-sm">{initials}</AvatarFallback>
           </Avatar>
         </Button>
@@ -114,3 +120,4 @@ export function UserMenu() {
     </DropdownMenu>
   );
 }
+

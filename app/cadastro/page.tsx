@@ -512,7 +512,7 @@ export default function CadastroPage() {
                     "Criar Conta"
                   )}
                 </Button>
-                <div className="relative flex items-center justify-center">
+                {/* <div className="relative flex items-center justify-center">
                   <span className="absolute bg-card px-2 text-xs text-muted-foreground">
                     ou
                   </span>
@@ -526,7 +526,7 @@ export default function CadastroPage() {
                     <i className="fab fa-facebook-f mr-2" /> Continuar com
                     Facebook
                   </Button>
-                </div>
+                </div> */}
               </div>
               <p className="text-center text-sm text-muted-foreground">
                 Já tem uma conta?{" "}

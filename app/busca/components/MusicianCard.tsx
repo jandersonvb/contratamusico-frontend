@@ -46,10 +46,20 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
             : "relative w-full aspect-square bg-muted"
         }
       >
-        {/* Placeholder com ícone de usuário (futuramente pode ter imagem) */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <User className="h-16 w-16 text-muted-foreground/50" />
-        </div>
+        {musician.profileImageUrl ? (
+          <img
+            src={musician.profileImageUrl}
+            alt={musician.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          /* Avatar gerado com iniciais se não houver foto */
+          <img
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(musician.name)}&size=400&background=random&color=fff`}
+            alt={musician.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         {/* Rating badge */}
         <Badge className="absolute top-2 left-2 text-xs">
           ⭐ {musician.rating.toFixed(1)}

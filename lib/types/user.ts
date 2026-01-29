@@ -47,6 +47,7 @@ export interface User {
   phone?: string;
   city?: string;
   state?: string;
+  profileImageUrl?: string;
   musicianProfile?: UserMusicianProfile | null;
   createdAt?: string;
   updatedAt?: string;

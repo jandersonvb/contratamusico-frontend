@@ -58,20 +58,41 @@ export async function getMyBookings(): Promise<Booking[]> {
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  try {
+    const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Erro ao buscar contratações');
+    if (!response.ok) {
+      // Se for 404 ou erro similar, retorna array vazio ao invés de erro
+      if (response.status === 404) {
+        console.log('Nenhum booking encontrado');
+        return [];
+      }
+      
+      const errorData = await response.json().catch(() => null);
+      console.error('Erro na API de bookings:', errorData);
+      
+      // Se for erro de validação do backend, retorna array vazio
+      if (errorData?.message?.includes('Validation failed')) {
+        console.warn('Erro de validação ao buscar bookings, retornando lista vazia');
+        return [];
+      }
+      
+      throw new Error(errorData?.message || 'Erro ao buscar contratações');
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Erro ao buscar bookings:', error);
+    // Em caso de erro de rede ou outro, retorna array vazio
+    return [];
   }
-
-  return response.json();
 }
 
 /**

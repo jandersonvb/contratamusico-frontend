@@ -67,7 +67,7 @@ export function Hero() {
       </div>
 
       {/* transição suave para a próxima seção */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-b from-black/30 to-background" />
+      <div className="h-16 bg-gradient-to-b from-black/30 to-background" />
     </section>
   );
 }

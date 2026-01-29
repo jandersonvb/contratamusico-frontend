@@ -116,7 +116,7 @@ export default function LoginPage() {
                 Entrar
               </Button>
 
-              <div className="flex flex-col gap-3 mt-4">
+              {/* <div className="flex flex-col gap-3 mt-4">
                 <div className="relative flex items-center justify-center">
                   <span className="absolute  px-2 text-xs text-muted-foreground mb-2">
                     ou
@@ -132,7 +132,7 @@ export default function LoginPage() {
                     <Facebook className="h-4 w-4" /> Continuar com Facebook
                   </span>
                 </Button>
-              </div>
+              </div> */}
               <p className="text-xs text-center text-muted-foreground mt-4">
                 Não tem uma conta?{" "}
                 <a href="/cadastro" className="text-primary hover:underline">

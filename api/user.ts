@@ -62,3 +62,47 @@ export async function updateUserApi(data: UpdateUserData): Promise<User> {
 
   return response.json();
 }
+
+/**
+ * Upload de foto de perfil (avatar)
+ * POST /users/me/avatar
+ */
+export async function uploadAvatar(file: File): Promise<User> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Token não encontrado');
+  }
+
+  // Validações client-side
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (file.size > maxSize) {
+    throw new Error('Arquivo muito grande. Tamanho máximo: 5MB');
+  }
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/users/me/avatar`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao fazer upload da imagem');
+  }
+
+  return response.json();
+}

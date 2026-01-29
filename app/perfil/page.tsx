@@ -14,7 +14,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 
-import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle } from "lucide-react";
+import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -22,6 +22,9 @@ import { useUserStore } from "@/lib/stores/userStore";
 import { UserType } from "@/lib/types/user";
 import { getMySubscription, cancelSubscription, reactivateSubscription, createPortalSession } from "@/api/payment";
 import type { SubscriptionResponse } from "@/api/payment";
+import { uploadAvatar } from "@/api/user";
+import { uploadPortfolioFile, getMyPortfolio, deletePortfolioItem } from "@/api/portfolio";
+import type { PortfolioItem } from "@/lib/types/portfolio";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,6 +84,22 @@ export default function PerfilPage() {
   // Editing states
   const [editPersonal, setEditPersonal] = useState(false);
   const [editMusical, setEditMusical] = useState(false);
+  
+  // Avatar upload state
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  
+  // Portfolio state
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
+  const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    description: "",
+    date: "",
+    location: "",
+    genre: "",
+  });
 
   // Form states - inicializado vazio, será preenchido pelo useEffect
   const [personalForm, setPersonalForm] = useState({
@@ -145,6 +164,26 @@ export default function PerfilPage() {
       fetchSubscriptionData();
     }
   }, [activeTab, isLoggedIn, subscriptionData, fetchSubscriptionData]);
+
+  // Buscar portfólio quando acessar a aba
+  useEffect(() => {
+    if (activeTab === "portfolio" && isLoggedIn && isMusician) {
+      fetchPortfolio();
+    }
+  }, [activeTab, isLoggedIn, isMusician]);
+
+  const fetchPortfolio = async () => {
+    setIsLoadingPortfolio(true);
+    try {
+      const items = await getMyPortfolio();
+      setPortfolioItems(items);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao carregar portfólio";
+      toast.error(message);
+    } finally {
+      setIsLoadingPortfolio(false);
+    }
+  };
 
   const handleCancelSubscription = async () => {
     setIsProcessingAction(true);
@@ -268,6 +307,89 @@ export default function PerfilPage() {
     setEditMusical(false);
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      await uploadAvatar(file);
+      await fetchUser(); // Recarregar dados do usuário
+      toast.success("Foto de perfil atualizada com sucesso!");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao fazer upload";
+      toast.error(message);
+    } finally {
+      setIsUploadingAvatar(false);
+      // Limpar o input para permitir upload do mesmo arquivo novamente
+      e.target.value = '';
+    }
+  };
+
+  const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!uploadForm.title.trim()) {
+      toast.error("Por favor, informe um título para o item");
+      return;
+    }
+
+    setIsUploadingPortfolio(true);
+    try {
+      await uploadPortfolioFile(file, {
+        title: uploadForm.title,
+        description: uploadForm.description || undefined,
+        date: uploadForm.date || undefined,
+        location: uploadForm.location || undefined,
+        genre: uploadForm.genre || undefined,
+      });
+      
+      toast.success("Arquivo adicionado ao portfólio com sucesso!");
+      setShowUploadModal(false);
+      setUploadForm({
+        title: "",
+        description: "",
+        date: "",
+        location: "",
+        genre: "",
+      });
+      await fetchPortfolio(); // Recarregar portfólio
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao fazer upload";
+      toast.error(message);
+    } finally {
+      setIsUploadingPortfolio(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeletePortfolioItem = async (itemId: number) => {
+    if (!confirm("Tem certeza que deseja remover este item do portfólio?")) {
+      return;
+    }
+
+    try {
+      await deletePortfolioItem(itemId);
+      toast.success("Item removido com sucesso!");
+      await fetchPortfolio(); // Recarregar portfólio
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao remover item";
+      toast.error(message);
+    }
+  };
+
+  const getMediaIcon = (type: string) => {
+    switch (type) {
+      case 'VIDEO':
+        return <Video className="h-5 w-5" />;
+      case 'AUDIO':
+        return <FileAudio className="h-5 w-5" />;
+      default:
+        return <Music className="h-5 w-5" />;
+    }
+  };
+
   // Loading state
   if (isLoading || !user) {
     return (
@@ -286,17 +408,32 @@ export default function PerfilPage() {
             {/* Profile card */}
             <div className="bg-card border rounded-lg p-6 text-center">
               <div className="relative inline-block mb-4">
+                {isUploadingAvatar && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  </div>
+                )}
                 <Image
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"
+                  src={user.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"}
                   alt={`${user.firstName} ${user.lastName}`}
                   width={100}
                   height={100}
                   className="rounded-full object-cover h-24 w-24"
                 />
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                  disabled={isUploadingAvatar}
+                />
                 <button
                   type="button"
                   aria-label="Alterar foto de perfil"
-                  className="absolute bottom-0 right-0 p-1 rounded-full bg-card border shadow text-muted-foreground hover:text-primary"
+                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                  disabled={isUploadingAvatar}
+                  className="absolute bottom-0 right-0 p-1 rounded-full bg-card border shadow text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -350,10 +487,10 @@ export default function PerfilPage() {
                   </div>
                 </div>
               )}
-              {isMusician && (
+              {isMusician && musicianProfile?.id && (
                 <div className="mt-6">
                   <a
-                    href={`/musico/${musicianProfile?.id}`}
+                    href={`/musico/${musicianProfile.id}`}
                     target="_blank"
                     className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
                     rel="noopener noreferrer"
@@ -708,13 +845,227 @@ export default function PerfilPage() {
                 </form>
               </div>
             )}
-            {/* Placeholder for other tabs */}
+            {/* Portfolio Tab */}
             {activeTab === "portfolio" && (
-              <div className="bg-card border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2">Portfólio</h3>
-                <p className="text-sm text-muted-foreground">
-                  Em breve você poderá gerenciar seu portfólio aqui.
-                </p>
+              <div className="space-y-6">
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-semibold">Meu Portfólio</h3>
+                    {isMusician && (
+                      <Button onClick={() => setShowUploadModal(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Adicionar Mídia
+                      </Button>
+                    )}
+                  </div>
+
+                  {!isMusician ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        Apenas músicos podem gerenciar portfólio
+                      </p>
+                    </div>
+                  ) : isLoadingPortfolio ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : portfolioItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Music className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="font-medium mb-2">Seu portfólio está vazio</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Adicione fotos, vídeos ou áudios das suas apresentações
+                      </p>
+                      <Button onClick={() => setShowUploadModal(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Adicionar Primeiro Item
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {portfolioItems.map((item) => (
+                        <div key={item.id} className="bg-muted/50 rounded-lg overflow-hidden group relative">
+                          {/* Preview */}
+                          <div className="aspect-video bg-muted flex items-center justify-center relative">
+                            {item.mediaType === 'IMAGE' ? (
+                              <Image
+                                src={item.mediaUrl}
+                                alt={item.title}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                {getMediaIcon(item.mediaType)}
+                                <span className="text-xs">{item.mediaType}</span>
+                              </div>
+                            )}
+                            {/* Delete button */}
+                            <button
+                              onClick={() => handleDeletePortfolioItem(item.id)}
+                              className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remover item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {/* Info */}
+                          <div className="p-3 space-y-1">
+                            <h4 className="font-medium text-sm truncate">{item.title}</h4>
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {item.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              {item.genre && (
+                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
+                                  {item.genre}
+                                </span>
+                              )}
+                              {item.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {item.location}
+                                </span>
+                              )}
+                              {item.date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(item.date).toLocaleDateString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Modal */}
+                {showUploadModal && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-card rounded-lg max-w-md w-full p-6 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Adicionar ao Portfólio</h3>
+                        <button
+                          onClick={() => {
+                            setShowUploadModal(false);
+                            setUploadForm({
+                              title: "",
+                              description: "",
+                              date: "",
+                              location: "",
+                              genre: "",
+                            });
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                          disabled={isUploadingPortfolio}
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label htmlFor="portfolio-title" className="text-sm font-medium">
+                            Título *
+                          </label>
+                          <Input
+                            id="portfolio-title"
+                            value={uploadForm.title}
+                            onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                            placeholder="Ex: Show no Teatro Municipal"
+                            disabled={isUploadingPortfolio}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label htmlFor="portfolio-description" className="text-sm font-medium">
+                            Descrição
+                          </label>
+                          <Textarea
+                            id="portfolio-description"
+                            value={uploadForm.description}
+                            onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                            placeholder="Descreva brevemente..."
+                            rows={3}
+                            disabled={isUploadingPortfolio}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label htmlFor="portfolio-genre" className="text-sm font-medium">
+                              Gênero
+                            </label>
+                            <Input
+                              id="portfolio-genre"
+                              value={uploadForm.genre}
+                              onChange={(e) => setUploadForm({ ...uploadForm, genre: e.target.value })}
+                              placeholder="Ex: Jazz"
+                              disabled={isUploadingPortfolio}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label htmlFor="portfolio-date" className="text-sm font-medium">
+                              Data
+                            </label>
+                            <Input
+                              id="portfolio-date"
+                              type="date"
+                              value={uploadForm.date}
+                              onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
+                              disabled={isUploadingPortfolio}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label htmlFor="portfolio-location" className="text-sm font-medium">
+                            Local
+                          </label>
+                          <Input
+                            id="portfolio-location"
+                            value={uploadForm.location}
+                            onChange={(e) => setUploadForm({ ...uploadForm, location: e.target.value })}
+                            placeholder="Ex: São Paulo, SP"
+                            disabled={isUploadingPortfolio}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label htmlFor="portfolio-file" className="text-sm font-medium">
+                            Arquivo *
+                          </label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Imagens (5MB), Vídeos (50MB) ou Áudios (10MB)
+                          </p>
+                          <input
+                            type="file"
+                            id="portfolio-file"
+                            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
+                            onChange={handlePortfolioFileChange}
+                            disabled={isUploadingPortfolio}
+                            className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+
+                      {isUploadingPortfolio && (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            Fazendo upload...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {activeTab === "avaliacoes" && (

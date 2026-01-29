@@ -4,12 +4,18 @@ import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/lib/stores/userStore";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserMenu } from "./components/UserMenu";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const { isLoggedIn } = useUserStore();
+
+  // Garante que o componente só renderize após a hidratação do Zustand
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur">
@@ -26,6 +32,9 @@ export function Navbar() {
         {/* Desktop */}
         <nav className={cn("hidden items-center gap-6 md:flex")}>
           <Link href="/" className="text-muted-foreground hover:text-foreground">Início</Link>
+          {hydrated && isLoggedIn && (
+            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">Dashboard</Link>
+          )}
           <Link href="/busca" className="text-muted-foreground hover:text-foreground">Buscar Músicos</Link>
           <Link href="/como-funciona" className="text-muted-foreground hover:text-foreground">Como Funciona</Link>
           <Link href="/contato" className="text-muted-foreground hover:text-foreground">Contato</Link>
@@ -33,7 +42,10 @@ export function Navbar() {
 
           {/* À direita: auth vs avatar */}
           <div className="ml-2">
-            {isLoggedIn ? (
+            {!hydrated ? (
+              // Placeholder durante hidratação para evitar flash de conteúdo
+              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+            ) : isLoggedIn ? (
               <UserMenu />
             ) : (
               <div className="flex items-center gap-2">
@@ -67,15 +79,19 @@ export function Navbar() {
         <div className="border-t bg-background md:hidden">
           <div className="container mx-auto flex flex-col gap-2 p-4">
             <Link href="/" onClick={() => setOpen(false)}>Início</Link>
+            {hydrated && isLoggedIn && (
+              <Link href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
+            )}
             <Link href="/busca" onClick={() => setOpen(false)}>Buscar Músicos</Link>
             <Link href="/como-funciona" onClick={() => setOpen(false)}>Como Funciona</Link>
             <Link href="/contato" onClick={() => setOpen(false)}>Contato</Link>
             <Link href="/planos" onClick={() => setOpen(false)}>Planos</Link>
 
-            {isLoggedIn ? (
+            {hydrated && isLoggedIn ? (
               <>
                 <div className="h-px bg-border my-2" />
                 <Link href="/perfil" onClick={() => setOpen(false)}>Perfil</Link>
+                <Link href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/configuracoes" onClick={() => setOpen(false)}>Configurações</Link>
                 <button
                   onClick={() => {
@@ -88,7 +104,7 @@ export function Navbar() {
                   Sair
                 </button>
               </>
-            ) : (
+            ) : hydrated && !isLoggedIn ? (
               <div className="mt-2 flex gap-2">
                 <Button asChild variant="outline" className="flex-1">
                   <Link href="/login">Entrar</Link>
@@ -97,7 +113,7 @@ export function Navbar() {
                   <Link href="/cadastro">Cadastrar</Link>
                 </Button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

@@ -9,8 +9,14 @@ interface PageProps {
 export default async function MusicianDetailPage({ params }: PageProps) {
   const { id } = await params;
 
+  // Validar se o ID é um número válido
+  const numericId = Number(id);
+  if (!id || isNaN(numericId) || numericId <= 0) {
+    notFound();
+  }
+
   try {
-    const musician = await fetchMusicianById(Number(id));
+    const musician = await fetchMusicianById(numericId);
     return <MusicianDetailClient musician={musician} />;
   } catch (error) {
     console.error('Error fetching musician:', error);
