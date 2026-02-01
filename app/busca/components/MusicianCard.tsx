@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Calendar, Clock, MapPin, Mail, User } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import type { MusicianListItem } from "@/lib/types/musician";
+import { Calendar, Clock, Heart, Mail, MapPin } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 interface MusicianCardProps {
   musician: MusicianListItem;
@@ -47,14 +48,14 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         }
       >
         {musician.profileImageUrl ? (
-          <img
+          <Image
             src={musician.profileImageUrl}
             alt={musician.name}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
           /* Avatar gerado com iniciais se não houver foto */
-          <img
+          <Image
             src={`https://ui-avatars.com/api/?name=${encodeURIComponent(musician.name)}&size=400&background=random&color=fff`}
             alt={musician.name}
             className="absolute inset-0 w-full h-full object-cover"

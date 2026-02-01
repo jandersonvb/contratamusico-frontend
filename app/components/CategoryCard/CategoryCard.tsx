@@ -1,8 +1,6 @@
-import Link from "next/link";
-import * as Icons from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import type { Category } from "@/app/lib/data/home";
+import { Card, CardContent } from "@/components/ui/card";
+import * as Icons from "lucide-react";
 
 export function CategoryCard({ item }: { item: Category }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

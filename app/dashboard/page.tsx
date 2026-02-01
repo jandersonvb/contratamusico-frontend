@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Booking, getMyBookings } from "@/api/booking";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserStore } from "@/lib/stores/userStore";
-import { CalendarDays, MessageSquare, Plus, Star, Users2, Loader2 } from "lucide-react";
+import { CalendarDays, Loader2, MessageSquare, Plus, Star, Users2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getMyBookings, Booking } from "@/api/booking";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();

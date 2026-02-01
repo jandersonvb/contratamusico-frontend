@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Footer } from "./components/Footer/Footer";
 import { Navbar } from "./components/Navbar/Navbar";
+import GoogleAnalytics from "./components/GoogleAnalytics";
 
 import { Inter, Poppins } from "next/font/google";
 
@@ -29,12 +30,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body className={`${poppins.variable} ${inter.variable} antialiased`}>
         <Navbar />
         {children}
         <Footer />
         <Toaster richColors position="bottom-right" />
+        
+        {/* Google Analytics */}
+        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+        )}
       </body>
     </html>
   );

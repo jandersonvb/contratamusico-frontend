@@ -5,10 +5,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, Facebook, Lock, Mail } from "lucide-react";
-import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/userStore";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
