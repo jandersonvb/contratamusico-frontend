@@ -29,6 +29,7 @@ import { MusicianProfile } from "@/lib/types/musician";
 import { createBooking } from "@/api/booking";
 import { addFavorite, removeFavorite, isFavorite } from "@/api/favorite";
 import { useUserStore } from "@/lib/stores/userStore";
+import { MusicianSchema } from "@/app/components/StructuredData/MusicianSchema";
 
 interface MusicianDetailClientProps {
   musician: MusicianProfile;
@@ -158,8 +159,10 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <section className="container mx-auto px-4 py-8 flex-1">
+    <>
+      <MusicianSchema musician={musician} />
+      <div className="min-h-screen flex flex-col">
+        <section className="container mx-auto px-4 py-8 flex-1">
         {/* Profile Header */}
         <div className="bg-card border rounded-lg p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
@@ -574,7 +577,8 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
           </aside>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 

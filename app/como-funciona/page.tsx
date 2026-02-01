@@ -6,6 +6,7 @@ import {
   howItWorksClient,
   howItWorksMusician,
 } from "@/app/lib/data/comoFunciona";
+import { SEO } from "../components/SEO/SEO";
 import {
   Accordion,
   AccordionContent,
@@ -22,8 +23,20 @@ export default function ComoFuncionaPage() {
   const [activeTab, setActiveTab] = useState<"client" | "musician">("client");
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Hero Section */}
+    <>
+      <SEO
+        title="Como Funciona"
+        description="Descubra como funciona o Contrata Músico. Guia completo para contratar músicos profissionais para seu evento ou começar a trabalhar como músico. Simples, rápido e seguro."
+        keywords={[
+          "como contratar músico",
+          "como funciona contrata músico",
+          "guia para contratar banda",
+          "trabalhar como músico",
+          "plataforma de músicos",
+        ]}
+      />
+      <div className="min-h-screen flex flex-col">
+        {/* Hero Section */}
       <section className="bg-primary/5 py-16 md:py-24">
         <div className="container mx-auto px-4 text-center space-y-6">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
@@ -161,7 +174,8 @@ export default function ComoFuncionaPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 

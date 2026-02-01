@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SEO } from "../components/SEO/SEO";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -76,8 +77,20 @@ export default function PlanosPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Hero / Toggles */}
+    <>
+      <SEO
+        title="Planos e Preços"
+        description="Confira nossos planos para músicos e clientes. Opções gratuitas e premium com recursos exclusivos. Planos mensais e anuais com desconto. Escolha o melhor para você."
+        keywords={[
+          "planos para músicos",
+          "preços contrata músico",
+          "assinatura músico",
+          "plano premium",
+          "plano gratuito músico",
+        ]}
+      />
+      <div className="min-h-screen flex flex-col">
+        {/* Hero / Toggles */}
       <section className="bg-muted/50 border-b py-12">
         <div className="container mx-auto px-4 text-center space-y-6">
           <h1 className="text-3xl font-bold">
@@ -238,6 +251,7 @@ export default function PlanosPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }

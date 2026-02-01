@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { SEO } from "../components/SEO/SEO";
 import { Pagination } from "./components/Pagination";
 import {
   Select,
@@ -110,8 +111,20 @@ export default function SearchPage() {
   const totalResults = pagination?.total || 0;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Hero search header */}
+    <>
+      <SEO
+        title="Buscar Músicos"
+        description="Encontre os melhores músicos profissionais para seu evento. Filtre por instrumento, estilo musical, localização e mais. Contrate de forma fácil e segura."
+        keywords={[
+          "buscar músico",
+          "encontrar banda",
+          "contratar DJ",
+          "músicos disponíveis",
+          "busca de músicos",
+        ]}
+      />
+      <div className="min-h-screen flex flex-col">
+        {/* Hero search header */}
       <section className="bg-primary/5 border-b py-12">
         <div className="container mx-auto px-4 text-center space-y-4">
           <h1 className="text-3xl font-bold">Encontre Músicos Incríveis</h1>
@@ -325,6 +338,7 @@ export default function SearchPage() {
           )}
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
