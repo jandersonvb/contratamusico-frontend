@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserStore } from "@/lib/stores/userStore";
 import { getMyConversations, getConversationMessages, sendMessage, markMessagesAsRead } from "@/api/chat";
-import type { Conversation, Message } from "@/api/chat";
+import type { Conversation, Message, LastMessage } from "@/api/chat";
 import { Loader2, Send, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,17 +37,33 @@ export default function MensagensPage() {
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
-      markMessagesAsRead(selectedConversation.id);
+      
+      // Marca como lida após um delay para evitar rate limit
+      setTimeout(() => {
+        markMessagesAsRead(selectedConversation.id).then(() => {
+          // Dispara evento para atualizar contador na navbar
+          window.dispatchEvent(new Event('unread-messages-updated'));
+        }).catch(() => {
+          // Silently fail - não mostra erro de throttling
+        });
+      }, 300);
     }
   }, [selectedConversation]);
 
   const fetchConversations = async () => {
     try {
       const data = await getMyConversations();
-      setConversations(data);
+      
+      // Garante que data é um array
+      const conversationsArray = Array.isArray(data) ? data : [];
+      setConversations(conversationsArray);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao carregar conversas';
-      toast.error(message);
+      // Não mostra erro de throttling
+      if (!message.includes('Too Many Requests') && !message.includes('ThrottlerException')) {
+        toast.error(message);
+      }
+      setConversations([]);
     } finally {
       setIsLoadingConversations(false);
     }
@@ -57,10 +73,17 @@ export default function MensagensPage() {
     setIsLoadingMessages(true);
     try {
       const data = await getConversationMessages(conversationId);
-      setMessages(data);
+      
+      // Garante que data é um array
+      const messagesArray = Array.isArray(data) ? data : [];
+      setMessages(messagesArray);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao carregar mensagens';
-      toast.error(message);
+      // Não mostra erro de throttling
+      if (!message.includes('Too Many Requests') && !message.includes('ThrottlerException')) {
+        toast.error(message);
+      }
+      setMessages([]);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -76,13 +99,22 @@ export default function MensagensPage() {
     setIsSending(true);
 
     try {
-      // Determina o ID do destinatário
-      const recipientId = selectedConversation.clientId === user?.id 
-        ? selectedConversation.musicianProfileId 
-        : selectedConversation.clientId;
+      const musicianId = selectedConversation.musicianProfileId;
+
+      if (!musicianId || typeof musicianId !== 'number') {
+        toast.error('Erro: ID do músico não encontrado na conversa');
+        console.error('❌ Erro: musicianProfileId não encontrado', selectedConversation);
+        return;
+      }
+
+      console.log('📤 Enviando mensagem:', {
+        conversationId: selectedConversation.id,
+        musicianId,
+        contentLength: newMessage.trim().length
+      });
 
       const message = await sendMessage({
-        recipientId,
+        musicianId,
         content: newMessage.trim(),
       });
 
@@ -91,9 +123,16 @@ export default function MensagensPage() {
 
       // Atualiza a lista de conversas
       fetchConversations();
+
+      // Dispara evento para atualizar contador na navbar
+      window.dispatchEvent(new Event('unread-messages-updated'));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao enviar mensagem';
-      toast.error(message);
+      console.error('❌ Erro ao enviar mensagem:', error);
+      // Não mostra erro de throttling
+      if (!message.includes('Too Many Requests') && !message.includes('ThrottlerException')) {
+        toast.error(message);
+      }
     } finally {
       setIsSending(false);
     }
@@ -125,34 +164,49 @@ export default function MensagensPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {conversations.map((conversation) => (
-                    <button
-                      key={conversation.id}
-                      onClick={() => setSelectedConversation(conversation)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${
-                        selectedConversation?.id === conversation.id
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      <div className="font-medium truncate">
-                        {conversation.musicianName || conversation.clientName || "Sem nome"}
-                      </div>
-                      {conversation.lastMessage && (
-                        <div className="text-sm opacity-80 truncate">
-                          {conversation.lastMessage}
-                        </div>
-                      )}
-                      <div className="text-xs opacity-70 mt-1">
-                        {new Date(conversation.lastMessageAt).toLocaleDateString('pt-BR')}
-                      </div>
-                      {conversation.unreadCount && conversation.unreadCount > 0 && (
-                        <span className="inline-block mt-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                  {conversations
+                    .filter(conversation => conversation && typeof conversation === 'object' && conversation.id)
+                    .map((conversation) => {
+                      // Determina o nome a exibir
+                      const displayName = conversation.otherParty?.name 
+                        || conversation.musicianName 
+                        || conversation.clientName 
+                        || "Sem nome";
+                      
+                      // Extrai o conteúdo da última mensagem
+                      const lastMessageText = typeof conversation.lastMessage === 'object' && conversation.lastMessage !== null
+                        ? (conversation.lastMessage as LastMessage).content || ''
+                        : (typeof conversation.lastMessage === 'string' ? conversation.lastMessage : '');
+                      
+                      return (
+                        <button
+                          key={conversation.id}
+                          onClick={() => setSelectedConversation(conversation)}
+                          className={`w-full text-left p-3 rounded-lg transition-colors ${
+                            selectedConversation?.id === conversation.id
+                              ? "bg-primary text-primary-foreground"
+                              : "hover:bg-muted"
+                          }`}
+                        >
+                          <div className="font-medium truncate">
+                            {displayName}
+                          </div>
+                          {lastMessageText && (
+                            <div className="text-sm opacity-80 truncate">
+                              {lastMessageText}
+                            </div>
+                          )}
+                          <div className="text-xs opacity-70 mt-1">
+                            {conversation.lastMessageAt ? new Date(conversation.lastMessageAt).toLocaleDateString('pt-BR') : ''}
+                          </div>
+                          {conversation.unreadCount && conversation.unreadCount > 0 && (
+                            <span className="inline-block mt-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                              {conversation.unreadCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
@@ -165,7 +219,10 @@ export default function MensagensPage() {
                 {/* Header da conversa */}
                 <div className="border-b p-4">
                   <h2 className="font-semibold">
-                    {selectedConversation.musicianName || selectedConversation.clientName || "Sem nome"}
+                    {selectedConversation.otherParty?.name 
+                      || selectedConversation.musicianName 
+                      || selectedConversation.clientName 
+                      || "Sem nome"}
                   </h2>
                 </div>
 
@@ -182,28 +239,30 @@ export default function MensagensPage() {
                       </p>
                     </div>
                   ) : (
-                    messages.map((message) => {
-                      const isMyMessage = message.senderId === user?.id;
-                      return (
-                        <div
-                          key={message.id}
-                          className={`flex ${isMyMessage ? "justify-end" : "justify-start"}`}
-                        >
+                    messages
+                      .filter(message => message && typeof message === 'object' && message.id)
+                      .map((message) => {
+                        const isMyMessage = message.senderId === user?.id;
+                        return (
                           <div
-                            className={`max-w-[70%] rounded-lg p-3 ${
-                              isMyMessage
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
+                            key={message.id}
+                            className={`flex ${isMyMessage ? "justify-end" : "justify-start"}`}
                           >
-                            <p className="text-sm">{message.content}</p>
-                            <span className="text-xs opacity-70 mt-1 block">
-                              {new Date(message.createdAt).toLocaleString('pt-BR')}
-                            </span>
+                            <div
+                              className={`max-w-[70%] rounded-lg p-3 ${
+                                isMyMessage
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted"
+                              }`}
+                            >
+                              <p className="text-sm">{String(message.content || '')}</p>
+                              <span className="text-xs opacity-70 mt-1 block">
+                                {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : ''}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   )}
                 </CardContent>
 

@@ -1,0 +1,5 @@
+# Esta pasta contém scripts utilitários do projeto
+# 
+# Para gerar favicons:
+# 1. Coloque um arquivo logo.png (1024x1024) nesta pasta
+# 2. Execute: npm run generate:favicons

@@ -51,6 +51,13 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Contrata Músico",
+  },
+  applicationName: "Contrata Músico",
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -105,6 +112,14 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
+        {/* PWA Meta Tags */}
+        <meta name="theme-color" content="#000000" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Contrata Músico" />
+        <link rel="manifest" href="/manifest.json" />
+        
         {/* Dados Estruturados */}
         <OrganizationSchema />
         <WebsiteSchema />

@@ -9,21 +9,72 @@ export interface Message {
   createdAt: string;
 }
 
+export interface ConversationParticipant {
+  id: number;
+  name: string;
+  profileImageUrl?: string;
+  type: 'musician' | 'client';
+}
+
+export interface LastMessage {
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
 export interface Conversation {
   id: number;
-  clientId: number;
-  musicianProfileId: number;
+  clientId?: number;
+  musicianProfileId?: number;
   lastMessageAt: string;
   createdAt: string;
   clientName?: string;
   musicianName?: string;
   unreadCount?: number;
-  lastMessage?: string;
+  lastMessage?: string | LastMessage;
+  otherParty?: ConversationParticipant;
 }
 
 export interface SendMessageData {
-  recipientId: number;
+  musicianId: number;
   content: string;
+}
+
+/**
+ * Normaliza os dados da conversa para garantir formato consistente
+ */
+function normalizeConversation(conv: any): Conversation {
+  // Normaliza lastMessage se for objeto
+  const lastMessageContent = typeof conv.lastMessage === 'object' && conv.lastMessage?.content
+    ? conv.lastMessage.content
+    : (typeof conv.lastMessage === 'string' ? conv.lastMessage : '');
+
+  // Garante que IDs são números
+  const id = typeof conv.id === 'number' ? conv.id : parseInt(conv.id);
+  const clientId = conv.clientId ? (typeof conv.clientId === 'number' ? conv.clientId : parseInt(conv.clientId)) : undefined;
+  const musicianProfileId = conv.musicianProfileId ? (typeof conv.musicianProfileId === 'number' ? conv.musicianProfileId : parseInt(conv.musicianProfileId)) : undefined;
+
+  const normalized = {
+    id,
+    clientId,
+    musicianProfileId,
+    lastMessageAt: conv.lastMessageAt,
+    createdAt: conv.createdAt,
+    unreadCount: conv.unreadCount,
+    clientName: conv.otherParty?.type === 'client' ? conv.otherParty.name : conv.clientName,
+    musicianName: conv.otherParty?.type === 'musician' ? conv.otherParty.name : conv.musicianName,
+    lastMessage: lastMessageContent,
+    otherParty: conv.otherParty,
+  };
+  
+  console.log('✅ Conversa normalizada:', {
+    id: normalized.id,
+    musicianProfileId: normalized.musicianProfileId,
+    clientId: normalized.clientId,
+    otherPartyName: conv.otherParty?.name
+  });
+  
+  return normalized;
 }
 
 /**
@@ -36,7 +87,7 @@ export async function getMyConversations(): Promise<Conversation[]> {
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/chat/conversations`, {
+  const response = await fetch(`${API_URL}/conversations`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -46,10 +97,14 @@ export async function getMyConversations(): Promise<Conversation[]> {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Erro ao buscar conversas');
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao buscar conversas';
+    throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // Normaliza cada conversa
+  return Array.isArray(data) ? data.map(normalizeConversation) : [];
 }
 
 /**
@@ -62,7 +117,7 @@ export async function getConversationMessages(conversationId: number): Promise<M
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -72,10 +127,15 @@ export async function getConversationMessages(conversationId: number): Promise<M
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Erro ao buscar mensagens');
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao buscar mensagens';
+    throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // O backend retorna um objeto com { messages: [...] }
+  // Extrai apenas o array de mensagens
+  return Array.isArray(data) ? data : (data.messages || []);
 }
 
 /**
@@ -88,21 +148,33 @@ export async function sendMessage(data: SendMessageData): Promise<Message> {
     throw new Error('Você precisa estar logado para enviar mensagens');
   }
 
-  const response = await fetch(`${API_URL}/chat/messages`, {
+  const { musicianId, content } = data;
+
+  // Validação do musicianId
+  if (!musicianId || typeof musicianId !== 'number' || isNaN(musicianId)) {
+    throw new Error('ID do músico inválido');
+  }
+
+  const response = await fetch(`${API_URL}/conversations/${musicianId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ content }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Erro ao enviar mensagem');
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao enviar mensagem';
+    throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // O backend retorna { message: '...', data: {...} }
+  // Retorna apenas os dados da mensagem
+  return result.data || result;
 }
 
 /**
@@ -115,7 +187,7 @@ export async function markMessagesAsRead(conversationId: number): Promise<void> 
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/chat/conversations/${conversationId}/mark-read`, {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/read`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -125,7 +197,37 @@ export async function markMessagesAsRead(conversationId: number): Promise<void> 
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Erro ao marcar mensagens como lidas');
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao marcar mensagens como lidas';
+    throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Busca o número de mensagens não lidas
+ */
+export async function getUnreadCount(): Promise<{ count: number }> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return { count: 0 };
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/conversations/unread/count`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return { count: 0 };
+    }
+
+    return response.json();
+  } catch {
+    return { count: 0 };
   }
 }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Search, Music4, MapPin } from "lucide-react";
 
 export function Hero() {
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [location, setLocation] = useState("");
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.append("q", searchTerm);
+    if (location) params.append("location", location);
+    
+    router.push(`/busca?${params.toString()}`);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+
   return (
     // FULL-BLEED: ocupa 100vw e ignora os gutters do layout
     <section className="relative w-screen overflow-hidden">
@@ -37,16 +57,24 @@ export function Hero() {
                 <Search className="h-5 w-5 text-muted-foreground" />
                 <Input
                   placeholder="Ex.: banda sertaneja, DJ, violino..."
-                  className="border-0 bg-transparent focus-visible:ring-0 text-muted-foreground"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="!border-0 !shadow-none !ring-0 !outline-none bg-transparent focus-visible:!ring-0 text-gray-800 placeholder:text-gray-500"
                 />
                 <div className="hidden md:flex items-center gap-2 border-l pl-2">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
                   <Input
                     placeholder="Cidade ou região"
-                    className="w-40 border-0 focus-visible:ring-0 text-muted-foreground"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-40 !border-0 !shadow-none !ring-0 !outline-none bg-transparent focus-visible:!ring-0 text-gray-800 placeholder:text-gray-500"
                   />
                 </div>
-                <Button className="ml-auto md:ml-0">Buscar</Button>
+                <Button onClick={handleSearch} className="ml-auto md:ml-0">
+                  Buscar
+                </Button>
               </div>
             </div>
 

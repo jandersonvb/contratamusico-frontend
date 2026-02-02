@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +29,7 @@ import Image from "next/image";
 import { MusicianProfile } from "@/lib/types/musician";
 import { createBooking } from "@/api/booking";
 import { addFavorite, removeFavorite, isFavorite } from "@/api/favorite";
+import { sendMessage } from "@/api/chat";
 import { useUserStore } from "@/lib/stores/userStore";
 import { MusicianSchema } from "@/app/components/StructuredData/MusicianSchema";
 
@@ -45,6 +47,7 @@ function getStarArray(rating: number) {
 }
 
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
+  const router = useRouter();
   const { isLoggedIn } = useUserStore();
   
   // Debug: Log do que está vindo do backend
@@ -61,6 +64,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
   const [favorite, setFavorite] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   const checkIfFavorite = useCallback(async () => {
     try {
@@ -158,6 +162,42 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
     }
   };
 
+  const handleStartChat = async () => {
+    if (!isLoggedIn) {
+      toast.error("Você precisa estar logado para enviar mensagens");
+      router.push('/login');
+      return;
+    }
+
+    setIsStartingChat(true);
+
+    try {
+      // Envia uma mensagem inicial automática
+      await sendMessage({
+        musicianId: musician.id,
+        content: `Olá ${musician.name}! Vi seu perfil e gostaria de conversar sobre contratar seus serviços.`
+      });
+      
+      toast.success("Conversa iniciada com sucesso! Redirecionando...");
+      
+      // Aguarda um pouco antes de redirecionar para evitar rate limit
+      setTimeout(() => {
+        // Dispara evento para atualizar contador na navbar
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('unread-messages-updated'));
+        }
+        router.push('/mensagens');
+      }, 800);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao iniciar conversa';
+      // Não mostra erro de throttling
+      if (!message.includes('Too Many Requests') && !message.includes('ThrottlerException')) {
+        toast.error(message);
+      }
+      setIsStartingChat(false);
+    }
+  };
+
   return (
     <>
       <MusicianSchema musician={musician} />
@@ -229,9 +269,17 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
               </div>
               <div className="flex gap-2">
                 <Button
-                  onClick={() => toast.info("Iniciar conversa com o músico")}
+                  onClick={handleStartChat}
+                  disabled={isStartingChat}
                 >
-                  Entrar em Contato
+                  {isStartingChat ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Iniciando...
+                    </>
+                  ) : (
+                    "Entrar em Contato"
+                  )}
                 </Button>
                 <Button
                   variant="outline"

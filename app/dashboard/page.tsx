@@ -40,11 +40,13 @@ export default function DashboardPage() {
   const fetchBookings = async () => {
     try {
       const data = await getMyBookings();
-      setBookings(data);
+      setBookings(Array.isArray(data) ? data : []);
     } catch (error) {
-      // Silenciosamente trata erros de booking vazio
-      console.error('Erro ao carregar bookings:', error);
-      setBookings([]); // Define como array vazio em caso de erro
+      // Silenciosamente trata erros, define como array vazio
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Dashboard: Erro ao carregar bookings', error);
+      }
+      setBookings([]);
     } finally {
       setIsLoadingBookings(false);
     }
@@ -143,22 +145,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Atalhos</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            <Button variant="secondary" onClick={() => {/* nova proposta */}}>
-              Criar proposta rápida
-            </Button>
-            <Button variant="secondary" onClick={() => {/* mensagens */}}>
-              Abrir mensagens
-            </Button>
-            <Button variant="secondary" onClick={() => {/* perfil */}}>
-              Completar perfil
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

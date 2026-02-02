@@ -51,6 +51,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
           <Image
             src={musician.profileImageUrl}
             alt={musician.name}
+            width={400}
+            height={400}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
@@ -58,6 +60,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
           <Image
             src={`https://ui-avatars.com/api/?name=${encodeURIComponent(musician.name)}&size=400&background=random&color=fff`}
             alt={musician.name}
+            width={400}
+            height={400}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
