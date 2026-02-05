@@ -10,16 +10,19 @@ import { Inter, Poppins } from "next/font/google";
 
 import { Toaster } from "sonner";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
   weight: ["400", "700"],
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+const poppins = Poppins({
   subsets: ["latin"],
+  variable: "--font-poppins",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
+
+
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br';
 
@@ -124,7 +127,7 @@ export default function RootLayout({
         <OrganizationSchema />
         <WebsiteSchema />
       </head>
-      <body className={`${poppins.variable} ${inter.variable} antialiased`}>
+      <body className={`${poppins.variable} ${inter.variable} antialiased overflow-x-hidden max-w-screen`}>
         <Navbar />
         {children}
         <Footer />

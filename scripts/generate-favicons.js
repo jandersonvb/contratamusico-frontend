@@ -1,128 +1,86 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const SOURCE_IMAGE = path.join(__dirname, 'logo.png');
-const OUTPUT_DIR = path.join(__dirname, '../app');
+const SOURCE_IMAGE = path.join(__dirname, '../public/images/logo.png');
+const PUBLIC_DIR = path.join(__dirname, '../public');
+const APP_DIR = path.join(__dirname, '../app');
 
-// Percentual de border radius (20% = bordas bem arredondadas)
-const BORDER_RADIUS_PERCENT = 20;
+const SIZES = {
+  // Next.js App Router conventions (placed in app/)
+  'icon.png': { size: 32, path: APP_DIR },
+  'apple-icon.png': { size: 180, path: APP_DIR }, // Apple touch icon
+  'opengraph-image.png': { size: [1200, 630], path: APP_DIR }, // Open Graph
+  'twitter-image.png': { size: [1200, 630], path: APP_DIR }, // Twitter
 
-const sizes = {
-  favicon: [
-    { size: 16, name: 'favicon-16x16.png' },
-    { size: 32, name: 'favicon-32x32.png' },
-    { size: 48, name: 'favicon-48x48.png' },
-  ],
-  icons: [
-    { size: 192, name: 'icon-192.png' },
-    { size: 512, name: 'icon-512.png' },
-  ],
-  apple: [
-    { size: 180, name: 'apple-touch-icon.png' },
-  ],
+  // Standard Favicon (placed in public/)
+  'favicon.ico': { sizes: [16, 32, 48], path: PUBLIC_DIR, format: 'ico' },
+  
+  // Web App Manifest icons (placed in public/icons/)
+  'android-chrome-192x192.png': { size: 192, path: path.join(PUBLIC_DIR, 'icons') },
+  'android-chrome-512x512.png': { size: 512, path: path.join(PUBLIC_DIR, 'icons') },
+  'favicon-16x16.png': { size: 16, path: path.join(PUBLIC_DIR, 'icons') },
+  'favicon-32x32.png': { size: 32, path: path.join(PUBLIC_DIR, 'icons') },
 };
 
-/**
- * Cria uma máscara SVG com bordas arredondadas
- * @param {number} size - Tamanho da imagem em pixels
- * @returns {Buffer} Buffer do SVG
- */
-function createRoundedMask(size) {
-  const radius = Math.round((size * BORDER_RADIUS_PERCENT) / 100);
-  
-  const svg = `
-    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="white"/>
-    </svg>
-  `;
-  
-  return Buffer.from(svg);
-}
-
-/**
- * Gera um favicon com bordas arredondadas
- * @param {number} size - Tamanho da imagem
- * @param {string} outputPath - Caminho de saída
- */
-async function generateRoundedIcon(size, outputPath) {
-  // 1. Redimensionar a imagem original
-  const resizedImage = await sharp(SOURCE_IMAGE)
-    .resize(size, size, {
-      fit: 'contain',
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    })
-    .toBuffer();
-
-  // 2. Criar máscara com bordas arredondadas
-  const mask = createRoundedMask(size);
-
-  // 3. Aplicar a máscara sobre a imagem
-  await sharp(resizedImage)
-    .composite([{
-      input: mask,
-      blend: 'dest-in'
-    }])
-    .png()
-    .toFile(outputPath);
-}
-
-async function generateFavicons() {
-  if (!fs.existsSync(SOURCE_IMAGE)) {
-    console.error(`❌ Arquivo fonte não encontrado: ${SOURCE_IMAGE}`);
-    console.log('📝 Coloque uma imagem PNG quadrada (recomendado 1024x1024) com o nome "logo.png" na pasta scripts/');
-    console.log('💡 Dica: Use uma imagem com fundo transparente para melhor resultado');
-    return;
+async function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
+}
 
-  console.log('🎨 Gerando favicons com bordas arredondadas...');
-  console.log(`📐 Border radius: ${BORDER_RADIUS_PERCENT}%\n`);
-
+async function generateIcons() {
   try {
-    // Verificar se a pasta de saída existe
-    if (!fs.existsSync(OUTPUT_DIR)) {
-      fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    console.log('🎨 Starting icon generation...');
+    
+    if (!fs.existsSync(SOURCE_IMAGE)) {
+      throw new Error(`Source image not found at: ${SOURCE_IMAGE}`);
     }
 
-    // Gerar PNGs para favicon em diferentes tamanhos
-    for (const { size, name } of sizes.favicon) {
-      await generateRoundedIcon(size, path.join(OUTPUT_DIR, name));
-      console.log(`✅ ${name} (${size}x${size}) - com bordas arredondadas`);
+    // Ensure output directories exist
+    await ensureDir(PUBLIC_DIR);
+    await ensureDir(APP_DIR);
+    await ensureDir(path.join(PUBLIC_DIR, 'icons'));
+
+    // Read source image
+    const imageBuffer = fs.readFileSync(SOURCE_IMAGE);
+
+    for (const [filename, config] of Object.entries(SIZES)) {
+      const outputPath = path.join(config.path, filename);
+      
+      if (config.format === 'ico') {
+        // Generate favicon.ico
+        console.log(`Generating ${filename}...`);
+        await sharp(imageBuffer)
+          .resize(32, 32, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          })
+          .png()
+          .toFile(outputPath);
+             
+      } else {
+        console.log(`Generating ${filename}...`);
+        const width = Array.isArray(config.size) ? config.size[0] : config.size;
+        const height = Array.isArray(config.size) ? config.size[1] : config.size;
+
+        await sharp(imageBuffer)
+          .resize(width, height, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          })
+          .png()
+          .toFile(outputPath);
+      }
     }
 
-    // Gerar ícones para PWA
-    for (const { size, name } of sizes.icons) {
-      await generateRoundedIcon(size, path.join(OUTPUT_DIR, name));
-      console.log(`✅ ${name} (${size}x${size}) - com bordas arredondadas`);
-    }
-
-    // Gerar Apple Touch Icon
-    for (const { size, name } of sizes.apple) {
-      await generateRoundedIcon(size, path.join(OUTPUT_DIR, name));
-      console.log(`✅ ${name} (${size}x${size}) - com bordas arredondadas`);
-    }
-
-    // Gerar favicon.ico (usando a imagem 32x32)
-    await generateRoundedIcon(32, path.join(OUTPUT_DIR, 'favicon.ico'));
-    console.log(`✅ favicon.ico (32x32) - com bordas arredondadas`);
-
-    // Copiar ícone principal para app/icon.png (Next.js detecta automaticamente)
-    await generateRoundedIcon(512, path.join(OUTPUT_DIR, 'icon.png'));
-    console.log(`✅ icon.png (512x512) - Ícone principal com bordas arredondadas`);
-
-    console.log('\n✨ Todos os favicons foram gerados com sucesso!');
-    console.log(`📁 Arquivos salvos em: ${OUTPUT_DIR}`);
-    console.log(`🎨 Border radius aplicado: ${BORDER_RADIUS_PERCENT}%`);
-    console.log('\n📌 Próximos passos:');
-    console.log('   1. Verifique os arquivos gerados na pasta app/');
-    console.log('   2. O Next.js detectará automaticamente os ícones');
-    console.log('   3. Execute "npm run dev" e acesse http://localhost:3000');
-    console.log('   4. Verifique o favicon no navegador');
-    console.log('\n💡 Dica: Ajuste BORDER_RADIUS_PERCENT no script se quiser mais ou menos arredondamento');
+    console.log('✅ All icons generated successfully!');
+    
   } catch (error) {
-    console.error('❌ Erro ao gerar favicons:', error.message);
+    console.error('❌ Error generating icons:', error);
     process.exit(1);
   }
 }
 
-generateFavicons();
+generateIcons();
