@@ -91,39 +91,43 @@ export default function PlanosPage() {
       />
       <div className="min-h-screen flex flex-col">
         {/* Hero / Toggles */}
-      <section className="bg-muted/50 border-b py-12">
-        <div className="container mx-auto px-4 text-center space-y-6">
-          <h1 className="text-3xl font-bold">
+      <section className="bg-muted/50 border-b py-8 sm:py-12">
+        <div className="container mx-auto px-4 text-center space-y-4 sm:space-y-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">
             Escolha o Plano Ideal para Você
           </h1>
-          <p className="max-w-2xl mx-auto text-muted-foreground">
+          <p className="max-w-2xl mx-auto text-sm sm:text-base text-muted-foreground">
             Oferecemos opções flexíveis para músicos e clientes, com recursos
             que se adaptam às suas necessidades
           </p>
-          <div className="flex justify-center gap-4 flex-wrap">
+          <div className="flex justify-center gap-2 sm:gap-4 flex-wrap">
             <Button
               variant={category === "musician" ? "default" : "outline"}
               onClick={() => setCategory("musician")}
+              size="sm"
+              className="text-xs sm:text-sm"
             >
               Para Músicos
             </Button>
             <Button
               variant={category === "client" ? "default" : "outline"}
               onClick={() => setCategory("client")}
+              size="sm"
+              className="text-xs sm:text-sm"
             >
               Para Clientes
             </Button>
           </div>
-          <div className="flex items-center justify-center gap-4 mt-4">
-            <span className="text-sm">Mensal</span>
+          <div className="flex items-center justify-center gap-3 sm:gap-4 mt-4">
+            <span className="text-xs sm:text-sm">Mensal</span>
             <Switch
               id="billingToggle"
               checked={annual}
               onCheckedChange={(val: boolean) => setAnnual(!!val)}
             />
-            <span className="text-sm flex items-center gap-1">
+            <span className="text-xs sm:text-sm flex items-center gap-1">
               Anual
-              <span className="ml-1 inline-block px-2 py-0.5 rounded-full bg-primary/10 text-xs text-primary">
+              <span className="ml-1 inline-block px-1.5 sm:px-2 py-0.5 rounded-full bg-primary/10 text-[10px] sm:text-xs text-primary">
                 -20%
               </span>
             </span>
@@ -131,14 +135,14 @@ export default function PlanosPage() {
         </div>
       </section>
       {/* Plans section */}
-      <section className="py-12">
+      <section className="py-8 sm:py-12">
         <div className="container mx-auto px-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {plans.map((plan) => {
                 const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                 const formattedPrice = price === 0 
@@ -148,49 +152,49 @@ export default function PlanosPage() {
                 return (
                   <div
                     key={plan.id}
-                    className={`relative bg-card border rounded-lg p-6 flex flex-col ${
+                    className={`relative bg-card border rounded-lg p-4 sm:p-6 flex flex-col ${
                       plan.badge ? "ring-2 ring-primary" : ""
                     }`}
                   >
                     {plan.badge && (
-                      <span className="absolute top-0 right-0 mt-2 mr-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded">
+                      <span className="absolute top-0 right-0 mt-2 mr-2 bg-primary text-primary-foreground text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded">
                         {plan.badge}
                       </span>
                     )}
-                    <h3 className="text-xl font-semibold mb-1">{plan.title}</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-1">{plan.title}</h3>
                     <div className="flex items-baseline gap-1 mb-2">
-                      <span className="text-3xl font-bold text-primary">
+                      <span className="text-2xl sm:text-3xl font-bold text-primary">
                         {formattedPrice}
                       </span>
-                      {price !== 0 && <span className="text-sm">/mês</span>}
+                      {price !== 0 && <span className="text-xs sm:text-sm">/mês</span>}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4 min-h-[48px]">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 min-h-[40px] sm:min-h-[48px]">
                       {plan.description}
                     </p>
-                    <ul className="space-y-2 flex-1 mb-6">
+                    <ul className="space-y-1.5 sm:space-y-2 flex-1 mb-4 sm:mb-6">
                       {plan.features.map((feature) => (
                         <li
                           key={feature.id}
-                          className={`flex items-center gap-2 text-sm ${
+                          className={`flex items-center gap-2 text-xs sm:text-sm ${
                             feature.available
                               ? ""
                               : "text-muted-foreground line-through"
                           }`}
                         >
                           {feature.available ? (
-                            <Check className="h-4 w-4 text-green-500" />
+                            <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0" />
                           ) : (
-                            <X className="h-4 w-4 text-red-500" />
+                            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0" />
                           )}
-                          {feature.text}
+                          <span>{feature.text}</span>
                           {feature.highlight && (
-                            <StarIcon className="h-4 w-4 text-yellow-400" />
+                            <StarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-400 shrink-0" />
                           )}
                         </li>
                       ))}
                     </ul>
                     <Button
-                      className="w-full mt-auto"
+                      className="w-full mt-auto text-sm"
                       variant={plan.monthlyPrice === 0 ? "outline" : "default"}
                       onClick={() => handleSubscribe(plan)}
                       disabled={isProcessing}
@@ -214,18 +218,18 @@ export default function PlanosPage() {
         </div>
       </section>
       {/* FAQ section */}
-      <section className="bg-muted/50 border-t py-12">
+      <section className="bg-muted/50 border-t py-8 sm:py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-semibold mb-6 text-center">
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-center">
             Perguntas Frequentes
           </h2>
           <Accordion type="multiple" className="max-w-3xl mx-auto space-y-2">
             {planFaq.map((faq, idx) => (
               <AccordionItem key={idx} value={`faq-${idx}`}>
-                <AccordionTrigger className="flex items-center justify-between p-3 rounded-md bg-card hover:bg-muted">
+                <AccordionTrigger className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-card hover:bg-muted text-left text-sm sm:text-base">
                   <span>{faq.question}</span>
                 </AccordionTrigger>
-                <AccordionContent className="p-3 text-sm text-muted-foreground">
+                <AccordionContent className="p-2 sm:p-3 text-xs sm:text-sm text-muted-foreground">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -234,18 +238,18 @@ export default function PlanosPage() {
         </div>
       </section>
       {/* CTA section */}
-      <section className="py-12">
-        <div className="container mx-auto px-4 text-center space-y-4">
-          <h2 className="text-2xl font-bold">Pronto para Começar?</h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
+      <section className="py-8 sm:py-12">
+        <div className="container mx-auto px-4 text-center space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold">Pronto para Começar?</h2>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
             Junte‑se a milhares de músicos e clientes que já encontraram o match
             perfeito
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button size="lg" asChild>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+            <Button size="default" className="w-full sm:w-auto" asChild>
               <Link href="/cadastro">Começar Agora</Link>
             </Button>
-            <Button variant="outline" size="lg" asChild>
+            <Button variant="outline" size="default" className="w-full sm:w-auto" asChild>
               <Link href="/contato">Falar com Vendas</Link>
             </Button>
           </div>

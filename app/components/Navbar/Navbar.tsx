@@ -16,9 +16,50 @@ import {
   Mail, 
   CreditCard,
   User,
-  Settings,
+  Heart,
   LogOut
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+// Componente para mostrar Avatar e info do usuário no menu mobile
+function MobileUserHeader() {
+  const { user } = useUserStore();
+  
+  const getInitials = (name?: string, surname?: string) => {
+    const a = (name?.[0] ?? "U").toUpperCase();
+    const b = (surname?.[0] ?? "").toUpperCase();
+    return (a + b) || "U";
+  };
+
+  const initials = getInitials(user?.firstName, user?.lastName);
+  const fullName = user?.firstName 
+    ? `${user.firstName} ${user?.lastName ?? ""}`.trim() 
+    : "Minha conta";
+
+  return (
+    <div className="flex items-center gap-3 py-3 mb-2">
+      <Avatar className="h-12 w-12 border-2 border-primary/20">
+        {user?.profileImageUrl && (
+          <AvatarImage 
+            src={user.profileImageUrl} 
+            alt={fullName}
+          />
+        )}
+        <AvatarFallback className="text-base font-medium bg-primary/10">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex flex-col">
+        <span className="font-medium text-foreground">{fullName}</span>
+        {user?.email && (
+          <span className="text-sm text-muted-foreground truncate max-w-[180px]">
+            {user.email}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -148,18 +189,38 @@ export function Navbar() {
           size="icon"
           className="md:hidden"
           onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="mobile-menu"
+          aria-label={open ? "Fechar menu" : "Abrir menu"}
         >
-          <span className="sr-only">Abrir menu</span>
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 6h16M4 12h16M4 18h16" />
+          <span className="sr-only">{open ? "Fechar menu" : "Abrir menu"}</span>
+          <svg 
+            viewBox="0 0 24 24" 
+            className={cn("size-5 transition-transform duration-200", open && "rotate-90")} 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            {open ? (
+              <path d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            )}
           </svg>
         </Button>
       </div>
 
       {/* Mobile menu */}
-      {open && (
-        <div className="border-t bg-background md:hidden">
-          <div className="container mx-auto flex flex-col gap-2 p-4">
+      <div 
+        id="mobile-menu"
+        className={cn(
+          "border-t bg-background md:hidden overflow-hidden transition-all duration-300 ease-in-out",
+          open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+        )}
+        aria-hidden={!open}
+      >
+        <div className="container mx-auto flex flex-col gap-2 p-4">
             <Link href="/" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 py-2">
               <Home className="h-4 w-4" />
               Início
@@ -201,23 +262,25 @@ export function Navbar() {
             {hydrated && isLoggedIn ? (
               <>
                 <div className="h-px bg-border my-2" />
+                {/* Avatar e informações do usuário no mobile */}
+                <MobileUserHeader />
                 <Link href="/perfil" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 py-2">
                   <User className="h-4 w-4" />
-                  Perfil
+                  Meu Perfil
                 </Link>
-                <Link href="/configuracoes" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 py-2">
-                  <Settings className="h-4 w-4" />
-                  Configurações
+                <Link href="/favoritos" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 py-2">
+                  <Heart className="h-4 w-4" />
+                  Favoritos
                 </Link>
                 <button
                   onClick={() => {
-                    // opcional: await logout()
                     useUserStore.getState().logout?.();
                     setOpen(false);
                   }}
-                  className="text-left text-red-600 inline-flex items-center gap-2 py-2"
+                  className="text-left text-destructive inline-flex items-center gap-2 py-2 hover:text-destructive/80 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 rounded-sm"
+                  aria-label="Sair da conta"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
                   Sair
                 </button>
               </>
@@ -231,9 +294,8 @@ export function Navbar() {
                 </Button>
               </div>
             ) : null}
-          </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

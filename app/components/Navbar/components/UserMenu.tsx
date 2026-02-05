@@ -15,8 +15,10 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+// import { Skeleton } from "@/components/ui/skeleton"; // Commented out due to missing module
 import { User2, LayoutGrid, LogOut, Heart, MessageCircle } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Util: pega iniciais e encurta e-mail
 function getInitials(name?: string, surname?: string) {
@@ -31,7 +33,7 @@ function ellipsisEmail(email?: string) {
 
 export function UserMenu() {
   const router = useRouter();
-  const { user, logout } = useUserStore();
+  const { user, logout, isLoading, isLoggedIn } = useUserStore();
 
   const initials = useMemo(
     () => getInitials(user?.firstName, user?.lastName),
@@ -41,6 +43,13 @@ export function UserMenu() {
   const handleLogout = async () => {
     try { await logout?.(); } finally { router.push("/login"); }
   };
+
+  // Se está logado mas ainda não tem dados do usuário (carregando do backend)
+  if (isLoggedIn && !user && isLoading) {
+    return (
+      <Skeleton className="h-10 w-10 rounded-full" />
+    );
+  }
 
   return (
     <DropdownMenu>

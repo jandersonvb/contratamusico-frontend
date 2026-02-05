@@ -194,58 +194,58 @@ export default function CadastroPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <section className="flex-1 py-12">
+      <section className="flex-1 py-6 sm:py-12">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto bg-card border rounded-lg shadow-sm p-8">
+          <div className="max-w-3xl mx-auto bg-card border rounded-lg shadow-sm p-4 sm:p-6 md:p-8">
             {/* Header */}
-            <div className="text-center mb-8 space-y-2">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto">
-                <UserPlus className="h-6 w-6" />
+            <div className="text-center mb-6 sm:mb-8 space-y-2">
+              <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 text-primary mx-auto">
+                <UserPlus className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <h1 className="text-3xl font-bold">Crie sua conta</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl font-bold">Crie sua conta</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Junte-se à maior plataforma de contratação de músicos do Brasil
               </p>
             </div>
             {/* User type selector */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
               <button
                 type="button"
                 onClick={() => setUserType("cliente")}
-                className={`flex flex-col items-center justify-center rounded-md border p-4 transition-colors text-center space-y-1 ${
+                className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
                   userType === "cliente"
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted hover:bg-muted/70"
                 }`}
               >
-                <Calendar className="h-5 w-5 mb-1" />
-                <h3 className="font-medium">Sou Cliente</h3>
-                <p className="text-xs text-center">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
+                <h3 className="font-medium text-sm sm:text-base">Sou Cliente</h3>
+                <p className="text-[10px] sm:text-xs text-center">
                   Quero contratar músicos para meus eventos
                 </p>
               </button>
               <button
                 type="button"
                 onClick={() => setUserType("musico")}
-                className={`flex flex-col items-center justify-center rounded-md border p-4 transition-colors text-center space-y-1 ${
+                className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
                   userType === "musico"
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted hover:bg-muted/70"
                 }`}
               >
-                <Music className="h-5 w-5 mb-1" />
-                <h3 className="font-medium">Sou Músico</h3>
-                <p className="text-xs text-center">
+                <Music className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
+                <h3 className="font-medium text-sm sm:text-base">Sou Músico</h3>
+                <p className="text-[10px] sm:text-xs text-center">
                   Quero oferecer meus serviços musicais
                 </p>
               </button>
             </div>
             {/* Registration form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Informações básicas */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Informações Básicas</h2>
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3 sm:space-y-4">
+                <h2 className="text-base sm:text-lg font-semibold">Informações Básicas</h2>
+                <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="firstName">Nome</Label>
                     <Input
@@ -292,9 +292,9 @@ export default function CadastroPage() {
                     onChange={handleChange}
                   />
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1">
-                    <Label htmlFor="city">Cidade</Label>
+                    <Label htmlFor="city" className="text-sm">Cidade</Label>
                     <Input
                       id="city"
                       name="city"
@@ -304,7 +304,7 @@ export default function CadastroPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="state">Estado</Label>
+                    <Label htmlFor="state" className="text-sm">Estado</Label>
                     <Select
                       value={form.state}
                       onValueChange={(value) =>
@@ -329,18 +329,18 @@ export default function CadastroPage() {
               </div>
               {/* Informações musicais */}
               {userType === "musico" && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold">
+                <div className="space-y-3 sm:space-y-4">
+                  <h2 className="text-base sm:text-lg font-semibold">
                     Informações Musicais
                   </h2>
                   {/* Instruments */}
                   <div className="space-y-1">
-                    <Label>Instrumentos</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <Label className="text-sm">Instrumentos</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {instruments.map((inst) => (
                         <label
                           key={inst.value}
-                          className="inline-flex items-center gap-2 text-sm"
+                          className="inline-flex items-center gap-2 text-xs sm:text-sm"
                         >
                           <Checkbox
                             checked={form.instruments.includes(inst.value)}
@@ -355,12 +355,12 @@ export default function CadastroPage() {
                   </div>
                   {/* Genres */}
                   <div className="space-y-1">
-                    <Label>Estilos Musicais</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <Label className="text-sm">Estilos Musicais</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {genres.map((genre) => (
                         <label
                           key={genre.value}
-                          className="inline-flex items-center gap-2 text-sm"
+                          className="inline-flex items-center gap-2 text-xs sm:text-sm"
                         >
                           <Checkbox
                             checked={form.genres.includes(genre.value)}
@@ -424,8 +424,8 @@ export default function CadastroPage() {
                 </div>
               )}
               {/* Password */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Segurança</h2>
+              <div className="space-y-3 sm:space-y-4">
+                <h2 className="text-base sm:text-lg font-semibold">Segurança</h2>
                 <div className="space-y-1 relative">
                   <Label htmlFor="password">Senha</Label>
                   <div className="relative">
@@ -478,8 +478,8 @@ export default function CadastroPage() {
                 </div>
               </div>
               {/* Terms */}
-              <div className="space-y-4">
-                <label className="inline-flex items-start gap-2 text-sm">
+              <div className="space-y-3 sm:space-y-4">
+                <label className="inline-flex items-start gap-2 text-xs sm:text-sm">
                   <Checkbox
                     id="terms"
                     checked={form.terms}
@@ -487,6 +487,7 @@ export default function CadastroPage() {
                       setForm((prev) => ({ ...prev, terms: !!checked }))
                     }
                     required
+                    className="mt-0.5"
                   />
                   <span>
                     Aceito os{" "}
@@ -501,7 +502,7 @@ export default function CadastroPage() {
                 </label>
               </div>
               {/* Submit */}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>

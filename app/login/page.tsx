@@ -35,25 +35,25 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <section className="flex-1  py-12">
+      <section className="flex-1 py-8 sm:py-12">
         <div className="container mx-auto px-4 flex flex-col items-center">
-          <div className="max-w-md w-full  p-8 rounded-lg shadow-sm">
-            <div className="mb-6 text-center space-y-1">
+          <div className="max-w-md w-full bg-card border p-5 sm:p-8 rounded-lg shadow-sm">
+            <div className="mb-5 sm:mb-6 text-center space-y-1">
               <div className="flex items-center justify-center text-primary mb-2">
-                <Lock className="h-8 w-8" />
+                <Lock className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
-              <h1 className="text-2xl font-bold">Bem‑vindo de volta!</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl sm:text-2xl font-bold">Bem‑vindo de volta!</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Entre na sua conta para acessar músicos incríveis
               </p>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
               <div className="space-y-1">
                 <label
                   htmlFor="email"
-                  className="text-sm font-medium flex items-center gap-2"
+                  className="text-xs sm:text-sm font-medium flex items-center gap-2"
                 >
-                  <Mail className="h-4 w-4" /> E‑mail
+                  <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> E‑mail
                 </label>
                 <Input
                   id="email"
@@ -62,14 +62,15 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-1">
                 <label
                   htmlFor="password"
-                  className="text-sm font-medium flex items-center gap-2"
+                  className="text-xs sm:text-sm font-medium flex items-center gap-2"
                 >
-                  <Lock className="h-4 w-4" /> Senha
+                  <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Senha
                 </label>
                 <div className="relative">
                   <Input
@@ -79,6 +80,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    className="text-sm"
                   />
                   <button
                     type="button"
@@ -96,7 +98,7 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <label
                   htmlFor="remember"
                   className="flex items-center gap-2 cursor-pointer"
@@ -108,7 +110,7 @@ export default function LoginPage() {
                   />
                   <span>Lembrar de mim</span>
                 </label>
-                <a href="/esqueci-senha" className="text-primary hover:underline text-xs">
+                <a href="/esqueci-senha" className="text-primary hover:underline text-[10px] sm:text-xs">
                   Esqueci minha senha
                 </a>
               </div>
@@ -133,7 +135,7 @@ export default function LoginPage() {
                   </span>
                 </Button>
               </div> */}
-              <p className="text-xs text-center text-muted-foreground mt-4">
+              <p className="text-[10px] sm:text-xs text-center text-muted-foreground mt-4">
                 Não tem uma conta?{" "}
                 <a href="/cadastro" className="text-primary hover:underline">
                   Cadastre‑se gratuitamente

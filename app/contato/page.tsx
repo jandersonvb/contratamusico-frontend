@@ -122,22 +122,22 @@ export default function ContatoPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero */}
-      <section className="bg-primary/5 border-b py-12">
-        <div className="container mx-auto px-4 text-center space-y-4">
-          <h1 className="text-3xl font-bold">Entre em Contato</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+      <section className="bg-primary/5 border-b py-8 sm:py-12">
+        <div className="container mx-auto px-4 text-center space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">Entre em Contato</h1>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
             Estamos aqui para ajudar você a encontrar o músico perfeito ou a
             divulgar seu talento musical
           </p>
         </div>
       </section>
       {/* Contact form and info */}
-      <section className="container mx-auto px-4 py-12 flex-1">
-        <div className="grid lg:grid-cols-2 gap-12">
+      <section className="container mx-auto px-4 py-8 sm:py-12 flex-1">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Form */}
           <div>
-            <h2 className="text-2xl font-semibold mb-2">Envie sua Mensagem</h2>
-            <p className="text-sm text-muted-foreground mb-6">
+            <h2 className="text-xl sm:text-2xl font-semibold mb-2">Envie sua Mensagem</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
               Preencha o formulário abaixo e entraremos em contato em até 24
               horas
             </p>
@@ -238,12 +238,12 @@ export default function ContatoPage() {
             </form>
           </div>
           {/* Contact info */}
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <div>
-              <h2 className="text-2xl font-semibold mb-2">
+              <h2 className="text-xl sm:text-2xl font-semibold mb-2">
                 Outras Formas de Contato
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-4 text-sm sm:text-base">
                 {/* Email */}
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-full bg-primary/10 text-primary">
@@ -264,7 +264,7 @@ export default function ContatoPage() {
                   </div>
                   <div>
                     <h4 className="font-medium">Telefone</h4>
-                    <p>(11) 3000-0000</p>
+                    <p>(35) 9 9810-2070</p>
                     <span className="text-xs text-muted-foreground block mb-2">
                       Seg–Sex: 9h às 18h
                     </span>
@@ -285,7 +285,7 @@ export default function ContatoPage() {
                   </div>
                   <div>
                     <h4 className="font-medium">WhatsApp</h4>
-                    <p>(11) 99999-9999</p>
+                    <p>(35) 9 9810-2070</p>
                     <span className="text-xs text-muted-foreground">
                       Seg–Sex: 9h às 18h
                     </span>
@@ -299,11 +299,11 @@ export default function ContatoPage() {
                   <div>
                     <h4 className="font-medium">Endereço</h4>
                     <p>
-                      Rua da Música, 123
+                      Avenida Padre Lourenço da Costa, 3415
                       <br />
-                      Vila Madalena – São Paulo/SP
+                      Morro Grande – Itajubá/MG
                       <br />
-                      CEP: 05435-000
+                      CEP: 37502-710
                     </p>
                   </div>
                 </div>
@@ -343,27 +343,27 @@ export default function ContatoPage() {
         </div>
       </section>
       {/* FAQ */}
-      <section className="bg-muted/50 border-t py-12">
+      <section className="bg-muted/50 border-t py-8 sm:py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-semibold mb-6">Perguntas Frequentes</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Perguntas Frequentes</h2>
           <DynamicFAQ />
         </div>
       </section>
       {/* Map */}
-      <section className="py-12 border-t">
+      <section className="py-8 sm:py-12 border-t">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-semibold mb-6">Nossa Localização</h2>
-          <div className="bg-card border rounded-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-primary/10 text-primary">
-                <MapPin className="h-5 w-5" />
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Nossa Localização</h2>
+          <div className="bg-card border rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
+              <div className="p-2 sm:p-3 rounded-full bg-primary/10 text-primary shrink-0">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <p>Rua da Música, 123 – Vila Madalena</p>
-                <p>São Paulo/SP – CEP: 05435-000</p>
+              <div className="text-sm sm:text-base">
+                <p>Av. Padre Lourenço da Costa, 3415 – Morro Grande</p>
+                <p>Itajubá/MG – CEP: 37502-710</p>
               </div>
             </div>
-            <Button variant="outline">Ver no Google Maps</Button>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">Ver no Google Maps</Button>
           </div>
         </div>
       </section>

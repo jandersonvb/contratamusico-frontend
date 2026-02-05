@@ -96,14 +96,18 @@ export const useUserStore = create<UserState>()(
       {
         name: 'user-storage', // Nome no localStorage
         storage: createJSONStorage(() => localStorage),
-        // Apenas persistimos o isLoggedIn para saber se devemos tentar buscar o user ao recarregar
-        partialize: (state) => ({ isLoggedIn: state.isLoggedIn }),
+        // Persistimos o user completo para evitar flash de avatar sem foto após reload
+        partialize: (state) => ({ 
+          isLoggedIn: state.isLoggedIn,
+          user: state.user 
+        }),
         
         onRehydrateStorage: () => {
           return (hydratedState) => {
             // Ao recarregar a página:
             if (hydratedState?.isLoggedIn) {
               // Se estava logado, tenta buscar os dados atualizados do backend
+              // Isso garante que os dados estejam sempre sincronizados
               useUserStore.getState().fetchUser();
             }
           };

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
+import { Quote } from "lucide-react";
 
 const testimonials = [
   {
@@ -33,10 +34,10 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="bg-background py-16">
+    <section className="bg-background py-16" aria-labelledby="testimonials-title">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <h2 className="mb-2 text-3xl font-semibold">
+          <h2 id="testimonials-title" className="mb-2 text-3xl font-semibold">
             O que Nossos Clientes Dizem
           </h2>
           <p className="text-muted-foreground">
@@ -45,25 +46,34 @@ export function Testimonials() {
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {testimonials.map((t) => (
-            <Card key={t.id} className="h-full">
-              <CardContent className="flex h-full flex-col gap-4 p-6">
+            <Card 
+              key={t.id} 
+              className="h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+            >
+              <CardContent className="flex h-full flex-col gap-4 p-6 relative">
+                <Quote 
+                  className="absolute top-4 right-4 h-8 w-8 text-primary/10" 
+                  aria-hidden="true"
+                />
                 <div className="flex items-center gap-3">
-                  <div className="relative size-10 overflow-hidden rounded-full">
+                  <div className="relative size-12 overflow-hidden rounded-full ring-2 ring-primary/20">
                     <Image
                       src={t.avatar}
-                      alt={t.name}
+                      alt={`Foto de ${t.name}`}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">{t.name}</div>
+                    <div className="text-sm font-semibold">{t.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {t.role}
                     </div>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">“{t.quote}”</p>
+                <blockquote className="text-sm text-muted-foreground italic flex-1">
+                  "{t.quote}"
+                </blockquote>
               </CardContent>
             </Card>
           ))}

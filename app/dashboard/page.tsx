@@ -71,33 +71,34 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Cabeçalho */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">
             Olá, {user?.firstName ?? "música(o)"} 👋
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Aqui está um resumo do que está acontecendo na sua conta.
           </p>
         </div>
-        <Button onClick={() => router.push("/busca")} className="shrink-0">
+        <Button onClick={() => router.push("/busca")} className="shrink-0 w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
-          Novo pedido / Buscar músicos
+          <span className="sm:hidden">Buscar músicos</span>
+          <span className="hidden sm:inline">Novo pedido / Buscar músicos</span>
         </Button>
       </div>
 
       {/* Cards de métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
             <Card key={s.label} className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-                <Icon className="h-5 w-5 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium leading-tight">{s.label}</CardTitle>
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0 ml-2" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{s.value}</div>
+              <CardContent className="p-3 sm:p-4 pt-0 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">{s.value}</div>
               </CardContent>
             </Card>
           );
@@ -107,30 +108,30 @@ export default function DashboardPage() {
       {/* Próximos eventos / convites */}
       <div className="grid lg:grid-cols-3 gap-4 mt-6">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Minhas Solicitações</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Minhas Solicitações</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
             {bookings.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
+              <div className="text-center py-6 text-muted-foreground text-sm sm:text-base">
                 Nenhuma solicitação encontrada
               </div>
             ) : (
               bookings.slice(0, 5).map((booking) => (
                 <div
                   key={booking.id}
-                  className="flex items-center justify-between rounded-md border p-3"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 rounded-md border p-3"
                 >
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{booking.eventType}</div>
-                    <div className="text-sm text-muted-foreground">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate text-sm sm:text-base">{booking.eventType}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">
                       {new Date(booking.eventDate).toLocaleDateString('pt-BR')}
                       {booking.musicianName && ` • ${booking.musicianName}`}
                     </div>
                   </div>
                   <Badge
                     variant={booking.status === "confirmado" ? "default" : "secondary"}
-                    className="capitalize"
+                    className="capitalize w-fit text-xs"
                   >
                     {booking.status}
                   </Badge>
@@ -138,7 +139,7 @@ export default function DashboardPage() {
               ))
             )}
             {bookings.length > 5 && (
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full text-sm">
                 Ver todas ({bookings.length})
               </Button>
             )}

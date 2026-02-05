@@ -11,13 +11,15 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Grid, List, Search, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Grid, List, Search, Loader2, AlertCircle } from "lucide-react";
 import { SearchFilters } from "./components/SearchFilters";
 import { MusicianCard } from "./components/MusicianCard";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import { useLocationStore } from "@/lib/stores/locationStore";
 import { useInstrumentStore } from "@/lib/stores/instrumentStore";
 import { useGenreStore } from "@/lib/stores/genreStore";
+import { MusicianCardSkeleton } from "./components/MusicianCardSkeleton";
 
 export default function SearchPage() {
   // Search Store
@@ -125,28 +127,49 @@ export default function SearchPage() {
       />
       <div className="min-h-screen flex flex-col">
         {/* Hero search header */}
-      <section className="bg-primary/5 border-b py-12">
-        <div className="container mx-auto px-4 text-center space-y-4">
-          <h1 className="text-3xl font-bold">Encontre Músicos Incríveis</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+      <section className="bg-primary/5 border-b py-6 sm:py-12">
+        <div className="container mx-auto px-4 text-center space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">Encontre Músicos Incríveis</h1>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
             Use nossos filtros para encontrar o músico perfeito para seu evento
           </p>
           <form
             onSubmit={handleSearchSubmit}
             className="mx-auto max-w-xl flex items-center gap-2"
+            role="search"
+            aria-label="Buscar músicos"
           >
-            <input
-              type="text"
-              placeholder="Buscar por nome, instrumento ou estilo..."
-              value={filters.search}
-              onChange={handleSearchInput}
-              className="flex-1 rounded-md border px-4 py-2 focus:outline-none focus:ring ring-primary"
-            />
-            <Button type="submit" size="icon" variant="default" aria-label="Pesquisar">
+            <div className="flex-1 relative">
+              <Label htmlFor="search-musicians" className="sr-only">
+                Buscar por nome, instrumento ou estilo
+              </Label>
+              <input
+                id="search-musicians"
+                type="text"
+                placeholder="Buscar músicos..."
+                value={filters.search}
+                onChange={handleSearchInput}
+                className="w-full rounded-md border px-3 sm:px-4 py-2 text-sm sm:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                aria-describedby={filters.search ? "search-hint" : undefined}
+              />
+              {filters.search && (
+                <span id="search-hint" className="sr-only">
+                  Pressione Enter ou clique em Pesquisar para buscar
+                </span>
+              )}
+            </div>
+            <Button 
+              type="submit" 
+              size="icon" 
+              variant="default" 
+              aria-label="Pesquisar"
+              disabled={isLoading}
+              className="transition-all duration-200 hover:scale-105 active:scale-95"
+            >
               {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Search className="h-4 w-4" />
+                <Search className="h-4 w-4" aria-hidden="true" />
               )}
             </Button>
           </form>
@@ -154,7 +177,7 @@ export default function SearchPage() {
       </section>
 
       {/* Main content */}
-      <section className="container mx-auto px-4 flex-1 py-8 flex flex-col lg:flex-row gap-8">
+      <section className="container mx-auto px-4 flex-1 py-4 sm:py-8 flex flex-col lg:flex-row gap-4 sm:gap-8">
         <SearchFilters
           filters={filters}
           setFilters={handleFiltersChange}
@@ -162,53 +185,17 @@ export default function SearchPage() {
         />
         <div className="flex-1 flex flex-col">
           {/* Results header and controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-            <div>
-              <h2 className="text-2xl font-semibold">Músicos Encontrados</h2>
-              <span className="text-sm text-muted-foreground">
-                {isLoading ? "Buscando..." : `${totalResults} músicos encontrados`}
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button onClick={performSearch} disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Buscando...
-                  </>
-                ) : (
-                  "Aplicar Filtros"
-                )}
-              </Button>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Ordenar por:</span>
-                <Select value={sortBy} onValueChange={handleSortChange}>
-                  <SelectTrigger className="w-40">
-                    {(() => {
-                      switch (sortBy) {
-                        case "rating":
-                          return "Melhor Avaliação";
-                        case "price-low":
-                          return "Menor Preço";
-                        case "price-high":
-                          return "Maior Preço";
-                        case "newest":
-                          return "Mais Recentes";
-                        default:
-                          return "Relevância";
-                      }
-                    })()}
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rating">Melhor Avaliação</SelectItem>
-                    <SelectItem value="price-low">Menor Preço</SelectItem>
-                    <SelectItem value="price-high">Maior Preço</SelectItem>
-                    <SelectItem value="newest">Mais Recentes</SelectItem>
-                  </SelectContent>
-                </Select>
+          <div className="flex flex-col gap-3 sm:gap-4 mb-4">
+            {/* Title and count */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-semibold">Músicos Encontrados</h2>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  {isLoading ? "Buscando..." : `${totalResults} músicos encontrados`}
+                </span>
               </div>
-              {/* View toggle */}
-              <div className="flex gap-2">
+              {/* Desktop-only view toggle */}
+              <div className="hidden sm:flex gap-2">
                 <Button
                   variant={view === "grid" ? "default" : "outline"}
                   size="icon"
@@ -227,45 +214,91 @@ export default function SearchPage() {
                 </Button>
               </div>
             </div>
+            
+            {/* Controls row - stacked on mobile */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center">
+              <Button 
+                onClick={performSearch} 
+                disabled={isLoading} 
+                className="w-full sm:w-auto"
+                size="sm"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  "Aplicar Filtros"
+                )}
+              </Button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
+                <Select value={sortBy} onValueChange={handleSortChange}>
+                  <SelectTrigger className="flex-1 sm:w-40 text-sm">
+                    {(() => {
+                      switch (sortBy) {
+                        case "rating":
+                          return "Avaliação";
+                        case "price-low":
+                          return "Menor Preço";
+                        case "price-high":
+                          return "Maior Preço";
+                        case "newest":
+                          return "Recentes";
+                        default:
+                          return "Relevância";
+                      }
+                    })()}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rating">Melhor Avaliação</SelectItem>
+                    <SelectItem value="price-low">Menor Preço</SelectItem>
+                    <SelectItem value="price-high">Maior Preço</SelectItem>
+                    <SelectItem value="newest">Mais Recentes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {/* Active filters chips */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4">
             {filters.city && (
-              <Badge variant="secondary">Cidade: {filters.city}</Badge>
+              <Badge variant="secondary" className="text-xs">Cidade: {filters.city}</Badge>
             )}
             {filters.state && filters.state !== "all" && (
-              <Badge variant="secondary">Estado: {getStateName(filters.state)}</Badge>
+              <Badge variant="secondary" className="text-xs">Estado: {getStateName(filters.state)}</Badge>
             )}
             {filters.instruments.map((slug) => (
-              <Badge key={slug} variant="secondary">
+              <Badge key={slug} variant="secondary" className="text-xs">
                 {getInstrumentName(slug)}
               </Badge>
             ))}
             {filters.genres.map((slug) => (
-              <Badge key={slug} variant="secondary">
+              <Badge key={slug} variant="secondary" className="text-xs">
                 {getGenreName(slug)}
               </Badge>
             ))}
             {filters.priceMin && filters.priceMax && (
-              <Badge variant="secondary">
-                Faixa: R$ {filters.priceMin} - R$ {filters.priceMax}
+              <Badge variant="secondary" className="text-xs">
+                R$ {filters.priceMin} - R$ {filters.priceMax}
               </Badge>
             )}
             {filters.priceMin && !filters.priceMax && (
-              <Badge variant="secondary">A partir de R$ {filters.priceMin}</Badge>
+              <Badge variant="secondary" className="text-xs">A partir de R$ {filters.priceMin}</Badge>
             )}
             {filters.priceMax && !filters.priceMin && (
-              <Badge variant="secondary">Até R$ {filters.priceMax}</Badge>
+              <Badge variant="secondary" className="text-xs">Até R$ {filters.priceMax}</Badge>
             )}
             {filters.rating && (
-              <Badge variant="secondary">Nota: {filters.rating}+</Badge>
+              <Badge variant="secondary" className="text-xs">Nota: {filters.rating}+</Badge>
             )}
             {filters.date && (
-              <Badge variant="secondary">Data: {filters.date}</Badge>
+              <Badge variant="secondary" className="text-xs">Data: {filters.date}</Badge>
             )}
             {filters.availability.map((avail) => (
-              <Badge key={avail} variant="secondary">
+              <Badge key={avail} variant="secondary" className="text-xs">
                 {avail === "weekends"
                   ? "Fins de semana"
                   : avail === "weekdays"
@@ -277,30 +310,59 @@ export default function SearchPage() {
 
           {/* Error message */}
           {error && (
-            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg mb-4">
-              {error}
+            <div 
+              className="bg-destructive/10 text-destructive px-3 sm:px-4 py-3 rounded-lg mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 border border-destructive/20"
+              role="alert"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-2 flex-1">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm sm:text-base">Erro ao buscar músicos</p>
+                  <p className="text-xs sm:text-sm opacity-90 truncate">{error}</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={performSearch}
+                className="text-destructive border-destructive/30 hover:bg-destructive/10 w-full sm:w-auto"
+              >
+                Tentar novamente
+              </Button>
             </div>
           )}
 
-          {/* Loading state */}
+          {/* Loading state - Skeleton */}
           {isLoading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div 
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+              aria-busy="true"
+              aria-label="Carregando músicos"
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <MusicianCardSkeleton key={i} />
+              ))}
             </div>
           )}
 
           {/* Empty state */}
-          {!isLoading && musicians.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                Nenhum músico encontrado com os filtros selecionados.
+          {!isLoading && !error && musicians.length === 0 && (
+            <div className="text-center py-10 sm:py-16 px-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-muted flex items-center justify-center">
+                <Search className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" aria-hidden="true" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Nenhum músico encontrado</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                Não encontramos músicos com os filtros selecionados. Tente ajustar sua busca ou limpar os filtros.
               </p>
               <Button
-                variant="link"
+                variant="default"
+                size="sm"
                 onClick={handleClearFilters}
-                className="mt-2"
+                className="transition-all duration-200 hover:scale-105"
               >
-                Limpar filtros
+                Limpar filtros e ver todos
               </Button>
             </div>
           )}
@@ -309,13 +371,13 @@ export default function SearchPage() {
           {!isLoading && musicians.length > 0 && (
             <>
               {view === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {musicians.map((musician) => (
                     <MusicianCard key={musician.id} musician={musician} />
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 sm:gap-4">
                   {musicians.map((musician) => (
                     <MusicianCard
                       key={musician.id}

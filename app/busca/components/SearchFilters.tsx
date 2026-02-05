@@ -80,16 +80,18 @@ export function SearchFilters({
   };
 
   return (
-    <aside className="w-full lg:w-72 shrink-0 lg:border-r lg:pr-6 mb-8 lg:mb-0">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Filtros</h3>
+    <aside className="w-full lg:w-72 shrink-0 lg:border-r lg:pr-6 mb-4 lg:mb-0">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <h3 className="text-base sm:text-lg font-semibold">Filtros</h3>
         <Button
           variant="ghost"
-          size="icon"
+          size="sm"
           aria-label="Limpar filtros"
           onClick={clearFilters}
+          className="h-8 px-2 text-xs sm:text-sm"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4 mr-1" />
+          Limpar
         </Button>
       </div>
       <Accordion

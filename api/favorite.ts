@@ -20,13 +20,11 @@ export async function addFavorite(musicianProfileId: number): Promise<Favorite> 
     throw new Error('Você precisa estar logado para favoritar');
   }
 
-  const response = await fetch(`${API_URL}/favorites`, {
+  const response = await fetch(`${API_URL}/favorites/${musicianProfileId}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ musicianProfileId }),
   });
 
   if (!response.ok) {
@@ -98,8 +96,19 @@ export async function isFavorite(musicianProfileId: number): Promise<boolean> {
   }
 
   try {
-    const favorites = await getMyFavorites();
-    return favorites.some(fav => fav.musicianProfileId === musicianProfileId);
+    const response = await fetch(`${API_URL}/favorites/check/${musicianProfileId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.isFavorite ?? false;
   } catch {
     return false;
   }

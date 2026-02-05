@@ -26,6 +26,7 @@ import {
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
+import { MusicianAvatar } from "@/components/ui/musician-avatar";
 import { MusicianProfile } from "@/lib/types/musician";
 import { createBooking } from "@/api/booking";
 import { addFavorite, removeFavorite, isFavorite } from "@/api/favorite";
@@ -49,15 +50,6 @@ function getStarArray(rating: number) {
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
   const router = useRouter();
   const { isLoggedIn } = useUserStore();
-  
-  // Debug: Log do que está vindo do backend
-  console.log('🎵 Musician Profile:', {
-    id: musician.id,
-    name: musician.name,
-    profileImageUrl: musician.profileImageUrl,
-    hasPortfolio: musician.portfolio?.length > 0,
-    firstPortfolioItem: musician.portfolio?.[0]
-  });
   
   // State for contact form
   const [form, setForm] = useState({ date: "", eventType: "", message: "" });
@@ -209,16 +201,11 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
             {/* Avatar and basic info */}
             <div className="flex items-start gap-4 md:col-span-2">
               <div className="relative">
-                <Image
-                  src={
-                    musician.profileImageUrl ||
-                    (musician.portfolio && musician.portfolio.length > 0 && musician.portfolio[0].type === 'IMAGE' && musician.portfolio[0].url) ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(musician.name)}&size=200&background=random&color=fff`
-                  }
-                  alt={musician.name}
-                  width={80}
-                  height={80}
-                  className="rounded-full object-cover h-20 w-20"
+                <MusicianAvatar
+                  src={musician.profileImageUrl}
+                  name={musician.name}
+                  size={200}
+                  className="rounded-full h-20 w-20"
                 />
                 {/* Online indicator */}
                 <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-card"></span>
