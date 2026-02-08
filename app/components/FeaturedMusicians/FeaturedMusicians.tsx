@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MusicianAvatar } from "@/components/ui/musician-avatar";
 import { fetchFeaturedMusicians } from "@/api/musician";
+import { useFavoriteStore } from "@/lib/stores/favoriteStore";
+import { useUserStore } from "@/lib/stores/userStore";
 import type { MusicianListItem } from "@/lib/types/musician";
-import { Star } from "lucide-react";
+import { Heart, Loader2, Star } from "lucide-react";
+import { toast } from "sonner";
 
 /** Skeleton card for loading state */
 function FeaturedMusicianSkeleton() {
@@ -23,6 +27,50 @@ function FeaturedMusicianSkeleton() {
         <div className="h-9 w-full rounded-md bg-secondary/50 mt-2" />
       </CardContent>
     </Card>
+  );
+}
+
+/** Botão de favorito para cada card */
+function FavoriteBtn({ musicianId }: { musicianId: number }) {
+  const router = useRouter();
+  const { isLoggedIn } = useUserStore();
+  const isFav = useFavoriteStore((s) => s.favoriteIds.has(musicianId));
+  const isToggling = useFavoriteStore((s) => s.togglingIds.has(musicianId));
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isLoggedIn) {
+      toast.error("Você precisa estar logado para favoritar");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      const added = await useFavoriteStore.getState().toggleFavorite(musicianId);
+      toast.success(added ? "Adicionado aos favoritos" : "Removido dos favoritos");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar favorito";
+      toast.error(message);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isToggling}
+      className="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/70 hover:bg-background transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm"
+      aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+    >
+      {isToggling ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : (
+        <Heart
+          className={`h-4 w-4 transition-colors ${isFav ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+        />
+      )}
+    </button>
   );
 }
 
@@ -93,6 +141,7 @@ export function FeaturedMusicians() {
                   fill
                   className="transition-transform duration-300 group-hover:scale-105"
                 />
+                <FavoriteBtn musicianId={musician.id} />
                 {musician.isFeatured && (
                   <span className="absolute right-3 top-3 rounded-full bg-warning text-warning-foreground px-3 py-1 text-xs font-medium">
                     Destaque

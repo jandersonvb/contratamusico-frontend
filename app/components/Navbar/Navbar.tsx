@@ -2,11 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/lib/stores/userStore";
+import { useChatStore } from "@/lib/stores/chatStore";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { UserMenu } from "./components/UserMenu";
-import { getUnreadCount } from "@/api/chat";
 import { 
   MessageCircle, 
   Home, 
@@ -64,52 +64,13 @@ function MobileUserHeader() {
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const { isLoggedIn } = useUserStore();
+  const { unreadCount } = useChatStore();
 
   // Garante que o componente só renderize após a hidratação do Zustand
   useEffect(() => {
     setHydrated(true);
   }, []);
-
-  // Busca o contador de mensagens não lidas
-  useEffect(() => {
-    if (!hydrated || !isLoggedIn) {
-      setUnreadCount(0);
-      return;
-    }
-
-    let debounceTimer: NodeJS.Timeout;
-
-    const fetchUnreadCount = async () => {
-      try {
-        const { count } = await getUnreadCount();
-        setUnreadCount(count);
-      } catch {
-        // Silently fail
-      }
-    };
-
-    // Busca inicial com delay para evitar conflito com outras requisições
-    const initialTimer = setTimeout(fetchUnreadCount, 500);
-
-    // Atualiza a cada 30 segundos
-    const interval = setInterval(fetchUnreadCount, 30000);
-
-    // Escuta evento customizado com debounce para evitar múltiplas requisições
-    const handleUpdate = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(fetchUnreadCount, 1000);
-    };
-    window.addEventListener('unread-messages-updated', handleUpdate);
-
-    return () => {
-      clearTimeout(initialTimer);
-      clearTimeout(debounceTimer);
-      clearInterval(interval);
-      window.removeEventListener('unread-messages-updated', handleUpdate);
-    };
-  }, [hydrated, isLoggedIn]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur">
@@ -139,7 +100,7 @@ export function Navbar() {
                 <MessageCircle className="h-4 w-4" />
                 Mensagens
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  <span className="absolute -top-2 -right-3 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-pulse shadow-sm shadow-red-500/50">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -235,7 +196,7 @@ export function Navbar() {
                   <MessageCircle className="h-4 w-4" />
                   Mensagens
                   {unreadCount > 0 && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white animate-pulse shadow-sm shadow-red-500/50 px-1">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}

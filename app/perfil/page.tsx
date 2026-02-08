@@ -101,6 +101,16 @@ export default function PerfilPage() {
     genre: "",
   });
 
+  // Lógica de limites de plano para portfólio
+  const userPlanTitle = subscriptionData?.subscription?.plan?.title?.toLowerCase() || '';
+  const isPaidPlan = subscriptionData?.hasSubscription && 
+    subscriptionData.subscription?.status === 'active' &&
+    (userPlanTitle.includes('profissional') || userPlanTitle.includes('premium'));
+  const MAX_FREE_PHOTOS = 3;
+  const photoCount = portfolioItems.filter(item => item.mediaType === 'IMAGE').length;
+  const canUploadPhoto = isPaidPlan || photoCount < MAX_FREE_PHOTOS;
+  const canUploadVideoAudio = !!isPaidPlan;
+
   // Form states - inicializado vazio, será preenchido pelo useEffect
   const [personalForm, setPersonalForm] = useState({
     firstName: "",
@@ -165,12 +175,15 @@ export default function PerfilPage() {
     }
   }, [activeTab, isLoggedIn, subscriptionData, fetchSubscriptionData]);
 
-  // Buscar portfólio quando acessar a aba
+  // Buscar portfólio e assinatura quando acessar a aba de portfólio
   useEffect(() => {
     if (activeTab === "portfolio" && isLoggedIn && isMusician) {
       fetchPortfolio();
+      if (!subscriptionData) {
+        fetchSubscriptionData();
+      }
     }
-  }, [activeTab, isLoggedIn, isMusician]);
+  }, [activeTab, isLoggedIn, isMusician, subscriptionData, fetchSubscriptionData]);
 
   const fetchPortfolio = async () => {
     setIsLoadingPortfolio(true);
@@ -335,6 +348,25 @@ export default function PerfilPage() {
       return;
     }
 
+    // Verificar restrições de plano
+    const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const videoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg'];
+    const isImage = imageTypes.includes(file.type);
+    const isVideoOrAudio = videoTypes.includes(file.type) || audioTypes.includes(file.type);
+
+    if (isImage && !canUploadPhoto) {
+      toast.error(`Você atingiu o limite de ${MAX_FREE_PHOTOS} fotos do plano gratuito. Faça upgrade para adicionar mais.`);
+      e.target.value = '';
+      return;
+    }
+
+    if (isVideoOrAudio && !canUploadVideoAudio) {
+      toast.error("Upload de vídeos e áudios está disponível apenas nos planos Profissional e Premium.");
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingPortfolio(true);
     try {
       await uploadPortfolioFile(file, {
@@ -407,19 +439,38 @@ export default function PerfilPage() {
           <aside className="space-y-6">
             {/* Profile card */}
             <div className="bg-card border rounded-lg p-6 text-center">
-              <div className="relative inline-block mb-4">
+              <button
+                type="button"
+                aria-label="Alterar foto de perfil"
+                onClick={() => document.getElementById('avatar-upload')?.click()}
+                disabled={isUploadingAvatar}
+                className="relative inline-block mb-4 group cursor-pointer disabled:cursor-not-allowed"
+              >
                 {isUploadingAvatar && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
                     <Loader2 className="h-8 w-8 animate-spin text-white" />
                   </div>
                 )}
-                <Image
-                  src={user.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop"}
-                  alt={`${user.firstName} ${user.lastName}`}
-                  width={100}
-                  height={100}
-                  className="rounded-full object-cover h-24 w-24"
-                />
+                {/* Overlay de hover */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 rounded-full transition-colors z-[5]">
+                  <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                {user.profileImageUrl ? (
+                  <Image
+                    src={user.profileImageUrl}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    width={100}
+                    height={100}
+                    className="rounded-full object-cover h-24 w-24"
+                  />
+                ) : (
+                  <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl font-semibold text-primary">
+                      {(user.firstName?.[0] || "").toUpperCase()}
+                      {(user.lastName?.[0] || "").toUpperCase()}
+                    </span>
+                  </div>
+                )}
                 <input
                   type="file"
                   id="avatar-upload"
@@ -428,16 +479,10 @@ export default function PerfilPage() {
                   onChange={handleAvatarChange}
                   disabled={isUploadingAvatar}
                 />
-                <button
-                  type="button"
-                  aria-label="Alterar foto de perfil"
-                  onClick={() => document.getElementById('avatar-upload')?.click()}
-                  disabled={isUploadingAvatar}
-                  className="absolute bottom-0 right-0 p-1 rounded-full bg-card border shadow text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <span className="absolute bottom-0 right-0 p-1 rounded-full bg-card border shadow text-muted-foreground group-hover:text-primary">
                   <Camera className="h-4 w-4" />
-                </button>
-              </div>
+                </span>
+              </button>
               <h2 className="text-lg font-semibold">{user.firstName} {user.lastName}</h2>
               {isMusician && musicianProfile?.category && (
                 <p className="text-sm text-muted-foreground mb-2">
@@ -849,7 +894,7 @@ export default function PerfilPage() {
             {activeTab === "portfolio" && (
               <div className="space-y-6">
                 <div className="bg-card border rounded-lg p-6">
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Meu Portfólio</h3>
                     {isMusician && (
                       <Button onClick={() => setShowUploadModal(true)}>
@@ -858,6 +903,24 @@ export default function PerfilPage() {
                       </Button>
                     )}
                   </div>
+
+                  {/* Banner de limites do plano */}
+                  {isMusician && !isPaidPlan && (
+                    <div className="flex items-start gap-3 p-4 mb-6 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-800 dark:text-amber-300">
+                          Plano Gratuito — {photoCount}/{MAX_FREE_PHOTOS} fotos utilizadas
+                        </p>
+                        <p className="text-amber-700 dark:text-amber-400 mt-1">
+                          No plano gratuito você pode ter até {MAX_FREE_PHOTOS} fotos. Vídeos e áudios estão disponíveis nos planos pagos.{" "}
+                          <Link href="/planos" className="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
+                            Fazer upgrade
+                          </Link>
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {!isMusician ? (
                     <div className="text-center py-8">
@@ -1041,15 +1104,38 @@ export default function PerfilPage() {
                           <label htmlFor="portfolio-file" className="text-sm font-medium">
                             Arquivo *
                           </label>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            Imagens (5MB), Vídeos (50MB) ou Áudios (10MB)
-                          </p>
+                          {canUploadVideoAudio ? (
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Imagens (5MB), Vídeos (50MB) ou Áudios (10MB)
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Apenas imagens (JPEG, PNG, WebP — até 5MB).{" "}
+                              {!canUploadPhoto && (
+                                <span className="text-destructive font-medium">
+                                  Limite de {MAX_FREE_PHOTOS} fotos atingido.
+                                </span>
+                              )}
+                              {canUploadPhoto && (
+                                <span>
+                                  Restam {MAX_FREE_PHOTOS - photoCount} foto(s).
+                                </span>
+                              )}
+                              {" "}
+                              <Link href="/planos" className="text-primary underline">
+                                Upgrade para vídeos e áudios
+                              </Link>
+                            </p>
+                          )}
                           <input
                             type="file"
                             id="portfolio-file"
-                            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
+                            accept={canUploadVideoAudio 
+                              ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg" 
+                              : "image/jpeg,image/png,image/webp"
+                            }
                             onChange={handlePortfolioFileChange}
-                            disabled={isUploadingPortfolio}
+                            disabled={isUploadingPortfolio || (!canUploadPhoto && !canUploadVideoAudio)}
                             className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 disabled:opacity-50"
                           />
                         </div>

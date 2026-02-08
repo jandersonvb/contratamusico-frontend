@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 // import { Skeleton } from "@/components/ui/skeleton"; // Commented out due to missing module
 import { User2, LayoutGrid, LogOut, Heart, MessageCircle } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
+import { useChatStore } from "@/lib/stores/chatStore";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Util: pega iniciais e encurta e-mail
@@ -34,6 +35,7 @@ function ellipsisEmail(email?: string) {
 export function UserMenu() {
   const router = useRouter();
   const { user, logout, isLoading, isLoggedIn } = useUserStore();
+  const { unreadCount } = useChatStore();
 
   const initials = useMemo(
     () => getInitials(user?.firstName, user?.lastName),
@@ -58,7 +60,7 @@ export function UserMenu() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 rounded-full border bg-foreground/5 hover:bg-foreground/10"
+          className="relative h-10 w-10 rounded-full border bg-foreground/5 hover:bg-foreground/10"
           aria-label="Menu do usuário"
         >
           <Avatar className="h-9 w-9">
@@ -70,6 +72,9 @@ export function UserMenu() {
             )}
             <AvatarFallback className="text-sm">{initials}</AvatarFallback>
           </Avatar>
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+          )}
         </Button>
       </DropdownMenuTrigger>
 
@@ -106,9 +111,16 @@ export function UserMenu() {
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild className="gap-2">
-          <Link href="/mensagens" className="flex items-center">
-            <MessageCircle className="h-4 w-4" />
-            <span>Mensagens</span>
+          <Link href="/mensagens" className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              <span>Mensagens</span>
+            </span>
+            {unreadCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1.5">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </Link>
         </DropdownMenuItem>
 

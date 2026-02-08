@@ -1,5 +1,44 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+/**
+ * Wrapper de fetch com retry automático para erros 429 (Too Many Requests).
+ * Usa backoff exponencial: 1s, 2s, 4s...
+ */
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(input, init);
+
+    if (response.status !== 429) {
+      return response;
+    }
+
+    // Última tentativa — retorna a resposta 429 para o caller tratar
+    if (attempt === maxRetries) {
+      return response;
+    }
+
+    // Respeita o header Retry-After se presente, senão usa backoff exponencial
+    const retryAfter = response.headers.get('Retry-After');
+    const delayMs = retryAfter
+      ? parseInt(retryAfter, 10) * 1000
+      : Math.min(1000 * Math.pow(2, attempt), 8000);
+
+    lastError = new Error(`429 Too Many Requests (tentativa ${attempt + 1}/${maxRetries})`);
+    console.warn(`[API] Rate limited. Retentando em ${delayMs}ms...`, lastError.message);
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  // Fallback (não deveria chegar aqui)
+  throw lastError ?? new Error('fetchWithRetry: erro inesperado');
+}
+
 export interface Message {
   id: number;
   conversationId: number;
@@ -38,6 +77,12 @@ export interface Conversation {
 export interface SendMessageData {
   musicianId: number;
   content: string;
+}
+
+export interface PaginatedMessagesResponse {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: number | null;
 }
 
 /**
@@ -87,7 +132,7 @@ export async function getMyConversations(): Promise<Conversation[]> {
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/conversations`, {
+  const response = await fetchWithRetry(`${API_URL}/conversations`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -117,7 +162,7 @@ export async function getConversationMessages(conversationId: number): Promise<M
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
+  const response = await fetchWithRetry(`${API_URL}/conversations/${conversationId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -136,6 +181,52 @@ export async function getConversationMessages(conversationId: number): Promise<M
   // O backend retorna um objeto com { messages: [...] }
   // Extrai apenas o array de mensagens
   return Array.isArray(data) ? data : (data.messages || []);
+}
+
+/**
+ * Busca mensagens paginadas de uma conversa (infinite scroll)
+ * Primeira chamada: sem cursor (carrega as 50 mais recentes)
+ * Chamadas seguintes: envia nextCursor para carregar mais antigas
+ */
+export async function getConversationMessagesPaginated(
+  conversationId: number,
+  cursor?: number,
+  take: number = 50
+): Promise<PaginatedMessagesResponse> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Token não encontrado');
+  }
+
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', String(cursor));
+  params.set('take', String(take));
+
+  const response = await fetchWithRetry(
+    `${API_URL}/conversations/${conversationId}/messages?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao buscar mensagens';
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+
+  return {
+    messages: Array.isArray(data.messages) ? data.messages : [],
+    hasMore: data.hasMore ?? false,
+    nextCursor: data.nextCursor ?? null,
+  };
 }
 
 /**
@@ -213,7 +304,7 @@ export async function getUnreadCount(): Promise<{ count: number }> {
   }
 
   try {
-    const response = await fetch(`${API_URL}/conversations/unread/count`, {
+    const response = await fetchWithRetry(`${API_URL}/conversations/unread/count`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

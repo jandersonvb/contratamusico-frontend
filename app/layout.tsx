@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Footer } from "./components/Footer/Footer";
+import { ConditionalFooter } from "./components/Footer/ConditionalFooter";
 import { Navbar } from "./components/Navbar/Navbar";
+import { ChatProvider } from "./components/ChatProvider";
+import { FloatingChat } from "./components/FloatingChat";
 import GoogleAnalytics from "./components/GoogleAnalytics";
 import { OrganizationSchema } from "./components/StructuredData/OrganizationSchema";
 import { WebsiteSchema } from "./components/StructuredData/WebsiteSchema";
@@ -128,9 +130,12 @@ export default function RootLayout({
         <WebsiteSchema />
       </head>
       <body className={`${poppins.variable} ${inter.variable} antialiased overflow-x-hidden max-w-screen`}>
-        <Navbar />
-        {children}
-        <Footer />
+        <ChatProvider>
+          <Navbar />
+          {children}
+          <ConditionalFooter />
+          <FloatingChat />
+        </ChatProvider>
         <Toaster richColors position="bottom-right" />
         
         {/* Google Analytics */}

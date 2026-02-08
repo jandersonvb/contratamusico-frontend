@@ -1,19 +1,43 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+/**
+ * Dados do músico dentro de um favorito (formato retornado pelo backend)
+ */
+export interface FavoriteMusician {
+  id: number;
+  name: string;
+  category: string;
+  location: string;
+  priceFrom: number;
+  rating: number;
+  ratingCount: number;
+  profileImageUrl?: string;
+  genres: { id: number; name: string; slug: string }[];
+  instruments: { id: number; name: string; slug: string }[];
+}
+
+/**
+ * Favorito completo retornado pelo backend
+ */
 export interface Favorite {
   id: number;
-  userId: number;
   musicianProfileId: number;
+  musician: FavoriteMusician;
   createdAt: string;
-  musicianName?: string;
-  musicianCategory?: string;
-  musicianRating?: number;
+}
+
+/**
+ * Resposta ao adicionar favorito
+ */
+interface AddFavoriteResponse {
+  message: string;
+  favorite: Favorite;
 }
 
 /**
  * Adiciona um músico aos favoritos
  */
-export async function addFavorite(musicianProfileId: number): Promise<Favorite> {
+export async function addFavorite(musicianProfileId: number): Promise<AddFavoriteResponse> {
   const token = localStorage.getItem('token');
 
   if (!token) {
@@ -88,7 +112,7 @@ export async function getMyFavorites(): Promise<Favorite[]> {
 /**
  * Verifica se um músico está nos favoritos
  */
-export async function isFavorite(musicianProfileId: number): Promise<boolean> {
+export async function checkIsFavorite(musicianProfileId: number): Promise<boolean> {
   const token = localStorage.getItem('token');
 
   if (!token) {
@@ -111,6 +135,35 @@ export async function isFavorite(musicianProfileId: number): Promise<boolean> {
     return data.isFavorite ?? false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Retorna a contagem de favoritos do usuário
+ */
+export async function getFavoritesCount(): Promise<number> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return 0;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/favorites/count`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return 0;
+    }
+
+    const data = await response.json();
+    return data.count ?? 0;
+  } catch {
+    return 0;
   }
 }
 

@@ -84,23 +84,20 @@ export function MusicianAvatar({
   }
 
   return (
-    <>
+    <div className={cn("relative overflow-hidden", className)}>
       {isLoading && (
-        <div 
-          className={cn("bg-muted animate-pulse", className)} 
-          style={{ width: size, height: size }}
-        />
+        <div className="absolute inset-0 bg-muted animate-pulse" />
       )}
       <Image
         src={imageUrl}
         alt={`Foto de ${name}`}
         width={size}
         height={size}
-        className={cn("object-cover", isLoading && "opacity-0", className)}
+        className={cn("object-cover w-full h-full", isLoading && "opacity-0")}
         onError={handleError}
         onLoad={handleLoad}
         unoptimized={shouldUnoptimize}
       />
-    </>
+    </div>
   );
 }

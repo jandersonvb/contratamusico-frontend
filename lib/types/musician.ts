@@ -8,6 +8,8 @@ export interface MusicianListItem {
   id: number;
   name: string;
   profileImageUrl?: string | null;
+  /** Fotos de capa / portfolio para exibir no carrossel do card */
+  photos?: string[];
   category: string | null;
   location: string;
   priceFrom: number | null;
@@ -29,18 +31,18 @@ export interface MusicianReview {
   clientName: string;
 }
 
-// Portfolio item
+// Portfolio item (alinhado com o backend: mediaUrl e mediaType)
 export interface PortfolioItem {
   id: number;
-  type: string;
-  url?: string;
-  image?: string;
+  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO';
+  mediaUrl: string;
   title?: string;
   description?: string;
   date?: string;
   location?: string;
   genre?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 // Perfil completo do músico

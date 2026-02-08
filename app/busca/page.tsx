@@ -336,11 +336,11 @@ export default function SearchPage() {
           {/* Loading state - Skeleton */}
           {isLoading && (
             <div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5"
               aria-busy="true"
               aria-label="Carregando músicos"
             >
-              {Array.from({ length: 6 }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <MusicianCardSkeleton key={i} />
               ))}
             </div>
@@ -371,7 +371,7 @@ export default function SearchPage() {
           {!isLoading && musicians.length > 0 && (
             <>
               {view === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                   {musicians.map((musician) => (
                     <MusicianCard key={musician.id} musician={musician} />
                   ))}

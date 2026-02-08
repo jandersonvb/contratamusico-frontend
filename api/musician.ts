@@ -43,7 +43,14 @@ export async function searchMusicians(params: SearchMusiciansParams = {}): Promi
   const queryString = buildQueryString(params);
   const url = `${API_URL}/musicians${queryString ? `?${queryString}` : ''}`;
 
-  const response = await fetch(url);
+  // Inclui token JWT se disponível para excluir o próprio perfil dos resultados
+  const headers: HeadersInit = {};
+  const token = localStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { headers });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
