@@ -6,8 +6,8 @@ export interface PortfolioItem {
   id: number;
   title: string;
   description?: string;
-  mediaUrl: string;
-  mediaType: MediaType;
+  url: string;
+  type: MediaType;
   date?: string;
   location?: string;
   genre?: string;

@@ -47,7 +47,7 @@ import {
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
-  
+
   // Verificar autenticação
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -84,10 +84,10 @@ export default function PerfilPage() {
   // Editing states
   const [editPersonal, setEditPersonal] = useState(false);
   const [editMusical, setEditMusical] = useState(false);
-  
+
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  
+
   // Portfolio state
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
@@ -101,15 +101,24 @@ export default function PerfilPage() {
     genre: "",
   });
 
-  // Lógica de limites de plano para portfólio
-  const userPlanTitle = subscriptionData?.subscription?.plan?.title?.toLowerCase() || '';
-  const isPaidPlan = subscriptionData?.hasSubscription && 
-    subscriptionData.subscription?.status === 'active' &&
-    (userPlanTitle.includes('profissional') || userPlanTitle.includes('premium'));
-  const MAX_FREE_PHOTOS = 3;
-  const photoCount = portfolioItems.filter(item => item.mediaType === 'IMAGE').length;
-  const canUploadPhoto = isPaidPlan || photoCount < MAX_FREE_PHOTOS;
-  const canUploadVideoAudio = !!isPaidPlan;
+  const currentPlan = subscriptionData?.subscription?.plan;
+
+  // Limites (se maxPhotos for null, é ilimitado)
+  const maxPhotosLimit = currentPlan?.maxPhotos ?? 3; // Fallback para 3 se não carregar
+  const maxVideosLimit = currentPlan?.maxVideos ?? 0; // Fallback para 0 se não carregar
+
+
+
+  const photosCount = portfolioItems.filter(item => item.type === 'IMAGE').length;
+  const videosCount = portfolioItems.filter(item => ['VIDEO', 'AUDIO'].includes(item.type)).length;
+
+  // Verifica se pode fazer upload
+  const canUploadPhoto = currentPlan?.maxPhotos === null || photosCount < maxPhotosLimit;
+  // Para vídeos, verificamos se é ilimitado (null) ou se o contador é menor que o limite
+  const canUploadVideoAudio = currentPlan?.maxVideos === null || (currentPlan?.maxVideos !== undefined && videosCount < maxVideosLimit);
+
+  const planName = currentPlan?.title || "Básico";
+
 
   // Form states - inicializado vazio, será preenchido pelo useEffect
   const [personalForm, setPersonalForm] = useState({
@@ -298,13 +307,7 @@ export default function PerfilPage() {
   const savePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateUser({
-        firstName: personalForm.firstName,
-        lastName: personalForm.lastName,
-        phone: personalForm.phone,
-        city: personalForm.city,
-        state: personalForm.state,
-      });
+      await updateUser({ ...personalForm });
       toast.success("Informações pessoais atualizadas!");
       setEditPersonal(false);
     } catch (error) {
@@ -315,7 +318,6 @@ export default function PerfilPage() {
 
   const saveMusicalInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implementar endpoint de atualização de perfil de músico no backend
     toast.success("Informações musicais atualizadas!");
     setEditMusical(false);
   };
@@ -356,13 +358,17 @@ export default function PerfilPage() {
     const isVideoOrAudio = videoTypes.includes(file.type) || audioTypes.includes(file.type);
 
     if (isImage && !canUploadPhoto) {
-      toast.error(`Você atingiu o limite de ${MAX_FREE_PHOTOS} fotos do plano gratuito. Faça upgrade para adicionar mais.`);
+      toast.error(`Você atingiu o limite de ${maxPhotosLimit} fotos do plano ${planName}. Faça upgrade para adicionar mais.`);
       e.target.value = '';
       return;
     }
 
     if (isVideoOrAudio && !canUploadVideoAudio) {
-      toast.error("Upload de vídeos e áudios está disponível apenas nos planos Profissional e Premium.");
+      toast.error(
+        maxVideosLimit === 0
+          ? `Seu plano atual (${planName}) não permite vídeos/áudios. Faça upgrade.`
+          : `Você atingiu o limite de ${maxVideosLimit} vídeos/áudios do plano ${planName}.`
+      );
       e.target.value = '';
       return;
     }
@@ -376,7 +382,7 @@ export default function PerfilPage() {
         location: uploadForm.location || undefined,
         genre: uploadForm.genre || undefined,
       });
-      
+
       toast.success("Arquivo adicionado ao portfólio com sucesso!");
       setShowUploadModal(false);
       setUploadForm({
@@ -494,11 +500,10 @@ export default function PerfilPage() {
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star
                       key={i}
-                      className={`h-4 w-4 ${
-                        i < Math.round(musicianProfile.rating || 0)
+                      className={`h-4 w-4 ${i < Math.round(musicianProfile.rating || 0)
                           ? "text-yellow-400"
                           : "text-muted-foreground"
-                      }`}
+                        }`}
                       fill={i < Math.round(musicianProfile.rating || 0) ? "currentColor" : "none"}
                     />
                   ))}
@@ -559,11 +564,10 @@ export default function PerfilPage() {
                   key={item.id}
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onClick={() => setActiveTab(item.id as any)}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                    activeTab === item.id
+                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${activeTab === item.id
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -905,15 +909,15 @@ export default function PerfilPage() {
                   </div>
 
                   {/* Banner de limites do plano */}
-                  {isMusician && !isPaidPlan && (
+                  {isMusician && currentPlan?.isMusicianPlan && !currentPlan?.isMusicianPlan && (
                     <div className="flex items-start gap-3 p-4 mb-6 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
                       <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                       <div className="text-sm">
                         <p className="font-medium text-amber-800 dark:text-amber-300">
-                          Plano Gratuito — {photoCount}/{MAX_FREE_PHOTOS} fotos utilizadas
+                          Plano Gratuito — {photosCount}/{maxPhotosLimit} fotos utilizadas
                         </p>
                         <p className="text-amber-700 dark:text-amber-400 mt-1">
-                          No plano gratuito você pode ter até {MAX_FREE_PHOTOS} fotos. Vídeos e áudios estão disponíveis nos planos pagos.{" "}
+                          No plano gratuito você pode ter até {maxPhotosLimit} fotos. Vídeos e áudios estão disponíveis nos planos pagos.{" "}
                           <Link href="/planos" className="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
                             Fazer upgrade
                           </Link>
@@ -951,17 +955,17 @@ export default function PerfilPage() {
                         <div key={item.id} className="bg-muted/50 rounded-lg overflow-hidden group relative">
                           {/* Preview */}
                           <div className="aspect-video bg-muted flex items-center justify-center relative">
-                            {item.mediaType === 'IMAGE' ? (
+                            {item.type === 'IMAGE' ? (
                               <Image
-                                src={item.mediaUrl}
+                                src={item.url}
                                 alt={item.title}
                                 fill
                                 className="object-cover"
                               />
                             ) : (
                               <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                {getMediaIcon(item.mediaType)}
-                                <span className="text-xs">{item.mediaType}</span>
+                                {getMediaIcon(item.type)}
+                                <span className="text-xs">{item.type}</span>
                               </div>
                             )}
                             {/* Delete button */}
@@ -1113,12 +1117,12 @@ export default function PerfilPage() {
                               Apenas imagens (JPEG, PNG, WebP — até 5MB).{" "}
                               {!canUploadPhoto && (
                                 <span className="text-destructive font-medium">
-                                  Limite de {MAX_FREE_PHOTOS} fotos atingido.
+                                  Limite de {maxPhotosLimit} fotos atingido.
                                 </span>
                               )}
                               {canUploadPhoto && (
                                 <span>
-                                  Restam {MAX_FREE_PHOTOS - photoCount} foto(s).
+                                  Restam {maxPhotosLimit - photosCount} foto(s).
                                 </span>
                               )}
                               {" "}
@@ -1130,8 +1134,8 @@ export default function PerfilPage() {
                           <input
                             type="file"
                             id="portfolio-file"
-                            accept={canUploadVideoAudio 
-                              ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg" 
+                            accept={canUploadVideoAudio
+                              ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
                               : "image/jpeg,image/png,image/webp"
                             }
                             onChange={handlePortfolioFileChange}
@@ -1209,11 +1213,10 @@ export default function PerfilPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Status</span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              subscriptionData.subscription?.status === "active"
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${subscriptionData.subscription?.status === "active"
                                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                 : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                            }`}
+                              }`}
                           >
                             {subscriptionData.subscription?.status === "active"
                               ? "Ativo"
@@ -1270,22 +1273,22 @@ export default function PerfilPage() {
                       </div>
 
                       {/* Features */}
-                      {subscriptionData.subscription?.plan.features && 
-                       subscriptionData.subscription.plan.features.length > 0 && (
-                        <div>
-                          <h4 className="font-medium mb-3">Recursos incluídos:</h4>
-                          <ul className="space-y-2">
-                            {subscriptionData.subscription.plan.features
-                              .filter((f) => f.available)
-                              .map((feature) => (
-                                <li key={feature.id} className="flex items-center gap-2 text-sm">
-                                  <Star className="h-4 w-4 text-primary" />
-                                  {feature.text}
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                      )}
+                      {subscriptionData.subscription?.plan.features &&
+                        subscriptionData.subscription.plan.features.length > 0 && (
+                          <div>
+                            <h4 className="font-medium mb-3">Recursos incluídos:</h4>
+                            <ul className="space-y-2">
+                              {subscriptionData.subscription.plan.features
+                                .filter((f) => f.available)
+                                .map((feature) => (
+                                  <li key={feature.id} className="flex items-center gap-2 text-sm">
+                                    <Star className="h-4 w-4 text-primary" />
+                                    {feature.text}
+                                  </li>
+                                ))}
+                            </ul>
+                          </div>
+                        )}
 
                       {/* Actions */}
                       <div className="space-y-3 pt-4 border-t">

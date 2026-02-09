@@ -477,24 +477,24 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                           Ver todos
                         </button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {musician.portfolio.slice(0, 4).map((item, idx) => (
+                      <div className="grid grid-cols-3 gap-2">
+                        {musician.portfolio?.slice(0, 3).map((item, idx) => (
                           <div
                             key={idx}
                             className="relative aspect-square rounded-lg overflow-hidden bg-muted group cursor-pointer"
                           >
-                            {item.mediaType === "IMAGE" && item.mediaUrl ? (
+                            {item.type === "IMAGE" && item.url ? (
                               <Image
-                                src={item.mediaUrl}
+                                src={item.url}
                                 alt={item.title || "Portfolio"}
                                 fill
                                 className="object-cover group-hover:scale-105 transition-transform duration-300"
                                 unoptimized
                               />
-                            ) : item.mediaType === "VIDEO" && item.mediaUrl ? (
+                            ) : item.type === "VIDEO" && item.url ? (
                               <>
                                 <Image
-                                  src={item.mediaUrl}
+                                  src={item.url}
                                   alt={item.title || "Portfolio"}
                                   fill
                                   className="object-cover"
@@ -701,17 +701,17 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
             {activeTab === "portfolio" && (
               <div>
                 <h2 className="text-xl font-semibold mb-6">Portfólio</h2>
-                {musician.portfolio && musician.portfolio.length > 0 ? (
+                {musician.portfolio && musician.portfolio?.length > 0 ? (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {musician.portfolio.map((item, idx) => (
+                    {musician.portfolio?.map((item, idx) => (
                       <div
                         key={idx}
                         className="bg-card border rounded-lg overflow-hidden group hover:shadow-md transition-shadow"
                       >
-                        {item.mediaType === "IMAGE" && item.mediaUrl && (
+                        {item.type === "IMAGE" && item.url && (
                           <div className="relative aspect-video">
                             <Image
-                              src={item.mediaUrl}
+                              src={item.url}
                               alt={item.title || "Portfolio item"}
                               fill
                               className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -719,10 +719,10 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                             />
                           </div>
                         )}
-                        {item.mediaType === "VIDEO" && item.mediaUrl && (
+                        {item.type === "VIDEO" && item.url && (
                           <div className="relative aspect-video">
                             <Image
-                              src={item.mediaUrl}
+                              src={item.url}
                               alt={item.title || "Portfolio item"}
                               fill
                               className="object-cover"
@@ -735,7 +735,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                             </div>
                           </div>
                         )}
-                        {item.mediaType === "AUDIO" && (
+                        {item.type === "AUDIO" && (
                           <div className="flex items-center gap-4 p-4 bg-muted/30">
                             <button
                               className="p-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"

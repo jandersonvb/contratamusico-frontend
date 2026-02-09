@@ -34,8 +34,8 @@ export interface MusicianReview {
 // Portfolio item (alinhado com o backend: mediaUrl e mediaType)
 export interface PortfolioItem {
   id: number;
-  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO';
-  mediaUrl: string;
+  type: 'IMAGE' | 'VIDEO' | 'AUDIO';
+  url: string;
   title?: string;
   description?: string;
   date?: string;

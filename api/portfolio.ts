@@ -44,7 +44,7 @@ export async function uploadPortfolioFile(
   const formData = new FormData();
   formData.append('file', file);
   formData.append('title', data.title);
-  
+
   if (data.description) formData.append('description', data.description);
   if (data.date) formData.append('date', data.date);
   if (data.location) formData.append('location', data.location);
@@ -62,10 +62,14 @@ export async function uploadPortfolioFile(
     if (response.status === 401) {
       throw new Error('Unauthorized');
     }
-    if (response.status === 403) {
-      throw new Error('Apenas músicos podem fazer upload de portfólio');
-    }
+
     const errorData = await response.json().catch(() => null);
+
+    if (response.status === 403 && errorData?.message) {
+      // Retorna a mensagem exata do backend (ex: "Limite de fotos atingido")
+      throw new Error(errorData.message);
+    }
+  
     throw new Error(errorData?.message || 'Erro ao fazer upload do arquivo');
   }
 

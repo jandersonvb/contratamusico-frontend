@@ -15,9 +15,16 @@ export interface Plan {
   monthlyPrice: number;
   yearlyPrice: number;
   badge: string | null;
+  features: PlanFeature[];
+
+  maxPhotos: number | null; // null = Ilimitado
+  maxVideos: number | null; // null = Ilimitado
+  hasSpotlight: boolean;
+  hasWhatsapp: boolean;
+  hasStatistics: boolean;
+  
   isMusicianPlan: boolean;
   isClientPlan: boolean;
-  features: PlanFeature[];
   createdAt: string;
 }
 
