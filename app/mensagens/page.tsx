@@ -81,9 +81,10 @@ function MensagensContent() {
     setLoadingMusician(true);
     fetchMusicianById(musicianId)
       .then((musician) => {
+        const recipientUserId = musician.userId ?? musician.id;
         const existing = conversations.find(
           (c) =>
-            c.otherParty?.id === musician.userId ||
+            c.otherParty?.id === recipientUserId ||
             c.musicianProfileId === musician.id
         );
 
@@ -97,7 +98,7 @@ function MensagensContent() {
 
         setPendingMusician({
           id: musician.id,
-          userId: musician.userId,
+          userId: recipientUserId,
           name: musician.name,
           profileImageUrl: musician.profileImageUrl,
         });

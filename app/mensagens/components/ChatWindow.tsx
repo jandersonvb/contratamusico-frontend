@@ -233,7 +233,11 @@ export function ChatWindow({
         setSendingFirst(true);
         emit(
           "message:send",
-          { recipientUserId: pendingMusician.userId, content },
+          {
+            recipientUserId: pendingMusician.userId,
+            musicianProfileId: pendingMusician.id,
+            content,
+          },
           async (response: unknown) => {
             const res = response as {
               success: boolean;

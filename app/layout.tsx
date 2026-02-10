@@ -8,21 +8,7 @@ import GoogleAnalytics from "./components/GoogleAnalytics";
 import { OrganizationSchema } from "./components/StructuredData/OrganizationSchema";
 import { WebsiteSchema } from "./components/StructuredData/WebsiteSchema";
 
-import { Inter, Poppins } from "next/font/google";
-
 import { Toaster } from "sonner";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  weight: ["400", "700"],
-});
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  variable: "--font-poppins",
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
-});
 
 
 
@@ -129,7 +115,7 @@ export default function RootLayout({
         <OrganizationSchema />
         <WebsiteSchema />
       </head>
-      <body className={`${poppins.variable} ${inter.variable} antialiased overflow-x-hidden max-w-screen`}>
+      <body className="antialiased overflow-x-hidden max-w-screen">
         <ChatProvider>
           <Navbar />
           {children}
