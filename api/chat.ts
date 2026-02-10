@@ -77,9 +77,19 @@ export interface Conversation {
 }
 
 export interface SendMessageData {
+  conversationId?: number;
   recipientUserId?: number;
   musicianProfileId?: number;
   content: string;
+}
+
+export interface SendMessageResponse {
+  id?: number;
+  conversationId?: number;
+  senderId?: number;
+  content?: string;
+  isRead?: boolean;
+  createdAt?: string;
 }
 
 export interface PaginatedMessagesResponse {
@@ -268,29 +278,50 @@ export async function getConversationMessagesPaginated(
 /**
  * Envia uma mensagem
  */
-export async function sendMessage(data: SendMessageData): Promise<Message> {
+export async function sendMessage(data: SendMessageData): Promise<SendMessageResponse> {
   const token = localStorage.getItem('token');
 
   if (!token) {
     throw new Error('Você precisa estar logado para enviar mensagens');
   }
 
-  const { recipientUserId, musicianProfileId, content } = data;
-  const targetId = recipientUserId ?? musicianProfileId;
+  const { conversationId, recipientUserId, musicianProfileId, content } = data;
 
-  // Validação do destino (novo: recipientUserId, legado: musicianProfileId)
-  if (!targetId || typeof targetId !== 'number' || isNaN(targetId)) {
-    throw new Error('ID do destinatário inválido');
+  const requestHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+
+  let response: Response;
+
+  // Conversa existente
+  if (conversationId && typeof conversationId === 'number' && !isNaN(conversationId)) {
+    response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify({ content }),
+    });
+  } else {
+    // Nova conversa
+    if (!recipientUserId || typeof recipientUserId !== 'number' || isNaN(recipientUserId)) {
+      throw new Error('ID do destinatário inválido');
+    }
+
+    response = await fetch(`${API_URL}/chat/messages`, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify({ recipientUserId, musicianProfileId, content }),
+    });
+
+    // Compatibilidade com backend sem prefixo /chat
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(`${API_URL}/conversations/messages`, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify({ recipientUserId, musicianProfileId, content }),
+      });
+    }
   }
-
-  const response = await fetch(`${API_URL}/conversations/${targetId}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({ content }),
-  });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);

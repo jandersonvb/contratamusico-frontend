@@ -4,7 +4,11 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { useUserStore } from "@/lib/stores/userStore";
-import { getConversationMessagesPaginated, getMyConversations } from "@/api/chat";
+import {
+  getConversationMessagesPaginated,
+  getMyConversations,
+  sendMessage,
+} from "@/api/chat";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { TypingIndicator } from "./TypingIndicator";
@@ -200,7 +204,7 @@ export function ChatWindow({
 
   // ─── Envia mensagem via WebSocket ───────────────────────────────
   const handleSend = useCallback(
-    (content: string) => {
+    async (content: string) => {
       if (conversationId) {
         const optimisticId = -Date.now();
         const createdAt = new Date().toISOString();
@@ -215,50 +219,91 @@ export function ChatWindow({
         });
         updateConversationLastMessage(conversationId, content, createdAt);
 
-        // Conversa existente: fluxo normal
-        emit(
-          "message:send",
-          { conversationId, content },
-          (response: unknown) => {
-            const res = response as { success: boolean; error?: string };
-            if (!res.success) {
-              console.error("[Chat] Erro ao enviar:", res.error);
-              removeMessage(conversationId, optimisticId);
+        if (isConnected) {
+          // Conversa existente: fluxo normal
+          emit(
+            "message:send",
+            { conversationId, content },
+            (response: unknown) => {
+              const res = response as { success: boolean; error?: string };
+              if (!res.success) {
+                console.error("[Chat] Erro ao enviar:", res.error);
+                removeMessage(conversationId, optimisticId);
+              }
             }
+          );
+        } else {
+          try {
+            await sendMessage({ conversationId, content });
+          } catch (error) {
+            console.error("[Chat] Erro ao enviar (REST fallback):", error);
+            removeMessage(conversationId, optimisticId);
           }
-        );
+        }
+
         emit("typing:stop", { conversationId });
       } else if (pendingMusician) {
         // Nova conversa: envia com recipientUserId para criar conversa
         setSendingFirst(true);
-        emit(
-          "message:send",
-          {
-            recipientUserId: pendingMusician.userId,
-            musicianProfileId: pendingMusician.id,
-            content,
-          },
-          async (response: unknown) => {
-            const res = response as {
-              success: boolean;
-              error?: string;
-              data?: { conversationId: number };
-            };
-            if (res.success && res.data?.conversationId) {
-              // Recarrega conversas para ter a nova na lista
-              try {
-                const convs = await getMyConversations();
-                setConversations(convs);
-              } catch {
-                // ignora erro de recarregar lista
+
+        if (isConnected) {
+          emit(
+            "message:send",
+            {
+              recipientUserId: pendingMusician.userId,
+              musicianProfileId: pendingMusician.id,
+              content,
+            },
+            async (response: unknown) => {
+              const res = response as {
+                success: boolean;
+                error?: string;
+                data?: { conversationId: number };
+              };
+              if (res.success && res.data?.conversationId) {
+                // Recarrega conversas para ter a nova na lista
+                try {
+                  const convs = await getMyConversations();
+                  setConversations(convs);
+                } catch {
+                  // ignora erro de recarregar lista
+                }
+                onConversationCreated?.(res.data.conversationId);
+              } else {
+                console.error("[Chat] Erro ao criar conversa:", res.error);
               }
-              onConversationCreated?.(res.data.conversationId);
-            } else {
-              console.error("[Chat] Erro ao criar conversa:", res.error);
+              setSendingFirst(false);
             }
+          );
+        } else {
+          try {
+            const result = await sendMessage({
+              recipientUserId: pendingMusician.userId,
+              musicianProfileId: pendingMusician.id,
+              content,
+            });
+
+            const convs = await getMyConversations();
+            setConversations(convs);
+
+            if (result.conversationId) {
+              onConversationCreated?.(result.conversationId);
+            } else {
+              const newConversation = convs.find(
+                (c) =>
+                  c.otherParty?.id === pendingMusician.userId ||
+                  c.musicianProfileId === pendingMusician.id
+              );
+              if (newConversation) {
+                onConversationCreated?.(newConversation.id);
+              }
+            }
+          } catch (error) {
+            console.error("[Chat] Erro ao criar conversa (REST fallback):", error);
+          } finally {
             setSendingFirst(false);
           }
-        );
+        }
       }
     },
     [
@@ -270,6 +315,7 @@ export function ChatWindow({
       addMessage,
       removeMessage,
       updateConversationLastMessage,
+      isConnected,
       user?.id,
     ]
   );
@@ -441,7 +487,7 @@ export function ChatWindow({
         onSend={handleSend}
         onTyping={handleTyping}
         onFocusInput={handleFocusInput}
-        disabled={!isConnected || sendingFirst}
+        disabled={sendingFirst}
       />
     </div>
   );
