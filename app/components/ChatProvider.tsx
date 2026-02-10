@@ -37,6 +37,27 @@ interface SocketOnlinePayload {
   userId: number;
 }
 
+function normalizeSocketPayload<T extends Record<string, unknown>>(
+  payload: unknown,
+  keys: string[] = ["data", "message", "payload"]
+): T | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const direct = payload as T;
+  if (typeof (direct as Record<string, unknown>).id === "number") {
+    return direct;
+  }
+
+  for (const key of keys) {
+    const nested = (payload as Record<string, unknown>)[key];
+    if (nested && typeof nested === "object") {
+      return nested as T;
+    }
+  }
+
+  return direct;
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { on, emit, isConnected } = useSocket();
   const { isLoggedIn, user } = useUserStore();
@@ -188,7 +209,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Nova mensagem recebida em tempo real
     const offNewMsg = on("message:new", (payload: unknown) => {
-      const msg = payload as SocketMessagePayload;
+      const msg = normalizeSocketPayload<SocketMessagePayload>(payload);
+      if (!msg?.conversationId || !msg?.id) {
+        console.warn("[ChatProvider] Payload inválido em message:new", payload);
+        return;
+      }
+
       addMessage(msg.conversationId, {
         id: msg.id,
         conversationId: msg.conversationId,
@@ -226,29 +252,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Mensagens marcadas como lidas pelo outro
     const offRead = on("message:read", (payload: unknown) => {
-      const data = payload as SocketReadPayload;
+      const data = normalizeSocketPayload<SocketReadPayload>(payload);
+      if (!data?.conversationId) return;
       markConversationAsRead(data.conversationId);
     });
 
     // Indicador de digitação
     const offTypingStart = on("typing:start", (payload: unknown) => {
-      const data = payload as SocketTypingPayload;
+      const data = normalizeSocketPayload<SocketTypingPayload>(payload);
+      if (!data?.conversationId || !data?.userId) return;
       setTyping(data.userId, data.conversationId, true);
     });
 
     const offTypingStop = on("typing:stop", (payload: unknown) => {
-      const data = payload as SocketTypingPayload;
+      const data = normalizeSocketPayload<SocketTypingPayload>(payload);
+      if (!data?.conversationId || !data?.userId) return;
       setTyping(data.userId, data.conversationId, false);
     });
 
     // Status online/offline
     const offOnline = on("user:online", (payload: unknown) => {
-      const data = payload as SocketOnlinePayload;
+      const data = normalizeSocketPayload<SocketOnlinePayload>(payload);
+      if (!data?.userId) return;
       setUserOnline(data.userId, true);
     });
 
     const offOffline = on("user:offline", (payload: unknown) => {
-      const data = payload as SocketOnlinePayload;
+      const data = normalizeSocketPayload<SocketOnlinePayload>(payload);
+      if (!data?.userId) return;
       setUserOnline(data.userId, false);
     });
 
