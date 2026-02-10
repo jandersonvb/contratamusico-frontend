@@ -202,9 +202,37 @@ export function ChatWindow({
     }
   }, [isLoadingMessages, initialLoad]);
 
-  // ─── Envia mensagem via WebSocket ───────────────────────────────
+  // ─── Envia mensagem via WebSocket (com fallback REST) ───────────
   const handleSend = useCallback(
     async (content: string) => {
+      const sendFirstMessageViaRest = async () => {
+        if (!pendingMusician) return;
+
+        const result = await sendMessage({
+          recipientUserId: pendingMusician.userId,
+          musicianProfileId: pendingMusician.id,
+          content,
+        });
+
+        const convs = await getMyConversations();
+        setConversations(convs);
+
+        if (result.conversationId) {
+          onConversationCreated?.(result.conversationId);
+          return;
+        }
+
+        const newConversation = convs.find(
+          (c) =>
+            c.otherParty?.id === pendingMusician.userId ||
+            c.musicianProfileId === pendingMusician.id
+        );
+
+        if (newConversation) {
+          onConversationCreated?.(newConversation.id);
+        }
+      };
+
       if (conversationId) {
         const optimisticId = -Date.now();
         const createdAt = new Date().toISOString();
@@ -220,14 +248,17 @@ export function ChatWindow({
         updateConversationLastMessage(conversationId, content, createdAt);
 
         if (isConnected) {
-          // Conversa existente: fluxo normal
           emit(
             "message:send",
             { conversationId, content },
-            (response: unknown) => {
+            async (response: unknown) => {
               const res = response as { success: boolean; error?: string };
-              if (!res.success) {
-                console.error("[Chat] Erro ao enviar:", res.error);
+              if (res.success) return;
+
+              try {
+                await sendMessage({ conversationId, content });
+              } catch (error) {
+                console.error("[Chat] Erro ao enviar:", res.error, error);
                 removeMessage(conversationId, optimisticId);
               }
             }
@@ -243,7 +274,6 @@ export function ChatWindow({
 
         emit("typing:stop", { conversationId });
       } else if (pendingMusician) {
-        // Nova conversa: envia com recipientUserId para criar conversa
         setSendingFirst(true);
 
         if (isConnected) {
@@ -258,46 +288,32 @@ export function ChatWindow({
               const res = response as {
                 success: boolean;
                 error?: string;
-                data?: { conversationId: number };
+                data?: { conversationId?: number };
+                conversationId?: number;
               };
-              if (res.success && res.data?.conversationId) {
-                // Recarrega conversas para ter a nova na lista
-                try {
+
+              const socketConversationId =
+                res.data?.conversationId || res.conversationId;
+
+              try {
+                if (res.success && socketConversationId) {
                   const convs = await getMyConversations();
                   setConversations(convs);
-                } catch {
-                  // ignora erro de recarregar lista
+                  onConversationCreated?.(socketConversationId);
+                  return;
                 }
-                onConversationCreated?.(res.data.conversationId);
-              } else {
-                console.error("[Chat] Erro ao criar conversa:", res.error);
+
+                await sendFirstMessageViaRest();
+              } catch (error) {
+                console.error("[Chat] Erro ao criar conversa:", res.error, error);
+              } finally {
+                setSendingFirst(false);
               }
-              setSendingFirst(false);
             }
           );
         } else {
           try {
-            const result = await sendMessage({
-              recipientUserId: pendingMusician.userId,
-              musicianProfileId: pendingMusician.id,
-              content,
-            });
-
-            const convs = await getMyConversations();
-            setConversations(convs);
-
-            if (result.conversationId) {
-              onConversationCreated?.(result.conversationId);
-            } else {
-              const newConversation = convs.find(
-                (c) =>
-                  c.otherParty?.id === pendingMusician.userId ||
-                  c.musicianProfileId === pendingMusician.id
-              );
-              if (newConversation) {
-                onConversationCreated?.(newConversation.id);
-              }
-            }
+            await sendFirstMessageViaRest();
           } catch (error) {
             console.error("[Chat] Erro ao criar conversa (REST fallback):", error);
           } finally {

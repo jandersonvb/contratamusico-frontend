@@ -1,5 +1,13 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+
+function getChatMessagesEndpoint() {
+  const trimmedApiUrl = API_URL.replace(/\/$/, '');
+  return trimmedApiUrl.endsWith('/chat')
+    ? `${trimmedApiUrl}/messages`
+    : `${trimmedApiUrl}/chat/messages`;
+}
+
 /**
  * Wrapper de fetch com retry automático para erros 429 (Too Many Requests).
  * Usa backoff exponencial: 1s, 2s, 4s...
@@ -307,20 +315,11 @@ export async function sendMessage(data: SendMessageData): Promise<SendMessageRes
       throw new Error('ID do destinatário inválido');
     }
 
-    response = await fetch(`${API_URL}/chat/messages`, {
+    response = await fetch(getChatMessagesEndpoint(), {
       method: 'POST',
       headers: requestHeaders,
       body: JSON.stringify({ recipientUserId, musicianProfileId, content }),
     });
-
-    // Compatibilidade com backend sem prefixo /chat
-    if (response.status === 404 || response.status === 405) {
-      response = await fetch(`${API_URL}/conversations/messages`, {
-        method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify({ recipientUserId, musicianProfileId, content }),
-      });
-    }
   }
 
   if (!response.ok) {
