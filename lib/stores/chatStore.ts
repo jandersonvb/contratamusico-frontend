@@ -33,6 +33,7 @@ interface ChatState {
   setConversations: (conversations: Conversation[]) => void;
   selectConversation: (id: number | null) => void;
   addMessage: (conversationId: number, message: Message) => void;
+  removeMessage: (conversationId: number, messageId: number) => void;
   setMessages: (conversationId: number, messages: Message[]) => void;
   prependMessages: (conversationId: number, messages: Message[]) => void;
   setPagination: (conversationId: number, hasMore: boolean, nextCursor: number | null) => void;
@@ -40,6 +41,7 @@ interface ChatState {
   setTyping: (userId: number, conversationId: number, isTyping: boolean) => void;
   setUserOnline: (userId: number, online: boolean) => void;
   setUnreadCount: (count: number) => void;
+  incrementUnread: (conversationId: number) => number;
   updateConversationLastMessage: (
     conversationId: number,
     content: string,
@@ -87,6 +89,32 @@ export const useChatStore = create<ChatState>()(
             const existing = state.messages[conversationId] || [];
             // Evita duplicatas por ID
             if (existing.some((m) => m.id === message.id)) return state;
+
+            // Se chegou a versão "real" de uma mensagem otimista (id negativo),
+            // substitui a pendente para evitar duplicar no histórico.
+            if (message.id > 0) {
+              const createdAtMs = Date.parse(message.createdAt);
+              const pendingIndex = existing.findIndex((m) => {
+                if (m.id >= 0) return false;
+                if (m.senderId !== message.senderId) return false;
+                if (m.content !== message.content) return false;
+                const pendingMs = Date.parse(m.createdAt);
+                if (Number.isNaN(createdAtMs) || Number.isNaN(pendingMs)) return false;
+                return Math.abs(createdAtMs - pendingMs) <= 10000;
+              });
+
+              if (pendingIndex >= 0) {
+                const next = existing.slice();
+                next[pendingIndex] = message;
+                return {
+                  messages: {
+                    ...state.messages,
+                    [conversationId]: next,
+                  },
+                };
+              }
+            }
+
             return {
               messages: {
                 ...state.messages,
@@ -96,6 +124,20 @@ export const useChatStore = create<ChatState>()(
           },
           false,
           "chat/addMessage"
+        ),
+
+      removeMessage: (conversationId, messageId) =>
+        set(
+          (state) => ({
+            messages: {
+              ...state.messages,
+              [conversationId]: (state.messages[conversationId] || []).filter(
+                (m) => m.id !== messageId
+              ),
+            },
+          }),
+          false,
+          "chat/removeMessage"
         ),
 
       setMessages: (conversationId, messages) =>
@@ -142,18 +184,25 @@ export const useChatStore = create<ChatState>()(
 
       markConversationAsRead: (conversationId) =>
         set(
-          (state) => ({
-            messages: {
-              ...state.messages,
-              [conversationId]: (state.messages[conversationId] || []).map(
-                (m) => ({ ...m, isRead: true })
+          (state) => {
+            const prevUnread =
+              state.conversations.find((c) => c.id === conversationId)?.unreadCount ?? 0;
+            const nextUnread = Math.max(0, state.unreadCount - prevUnread);
+
+            return {
+              messages: {
+                ...state.messages,
+                [conversationId]: (state.messages[conversationId] || []).map(
+                  (m) => ({ ...m, isRead: true })
+                ),
+              },
+              // Zera o unreadCount da conversa na lista
+              conversations: state.conversations.map((c) =>
+                c.id === conversationId ? { ...c, unreadCount: 0 } : c
               ),
-            },
-            // Zera o unreadCount da conversa na lista
-            conversations: state.conversations.map((c) =>
-              c.id === conversationId ? { ...c, unreadCount: 0 } : c
-            ),
-          }),
+              unreadCount: nextUnread,
+            };
+          },
           false,
           "chat/markAsRead"
         ),
@@ -195,6 +244,24 @@ export const useChatStore = create<ChatState>()(
 
       setUnreadCount: (count) =>
         set({ unreadCount: count }, false, "chat/setUnreadCount"),
+
+      incrementUnread: (conversationId) => {
+        let nextUnread = 0;
+        set(
+          (state) => {
+            const updated = state.conversations.map((c) => {
+              if (c.id !== conversationId) return c;
+              const current = c.unreadCount ?? 0;
+              return { ...c, unreadCount: current + 1 };
+            });
+            nextUnread = state.unreadCount + 1;
+            return { conversations: updated, unreadCount: nextUnread };
+          },
+          false,
+          "chat/incrementUnread"
+        );
+        return nextUnread;
+      },
 
       updateConversationLastMessage: (conversationId, content, date) =>
         set(
