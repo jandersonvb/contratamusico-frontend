@@ -1,5 +1,19 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+function buildApiPath(path: string, useLegacyChatPrefix = false) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  if (!useLegacyChatPrefix) {
+    return `${API_URL}${normalizedPath}`;
+  }
+
+  if (normalizedPath.startsWith('/chat/')) {
+    return `${API_URL}${normalizedPath}`;
+  }
+
+  return `${API_URL}/chat${normalizedPath}`;
+}
+
 
 function getChatMessagesEndpoint() {
   const trimmedApiUrl = API_URL.replace(/\/$/, '');
@@ -45,6 +59,25 @@ async function fetchWithRetry(
 
   // Fallback (não deveria chegar aqui)
   throw lastError ?? new Error('fetchWithRetry: erro inesperado');
+}
+
+async function fetchWithChatFallback(
+  path: string,
+  init?: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  const primaryResponse = await fetchWithRetry(buildApiPath(path), init, maxRetries);
+
+  if (primaryResponse.ok) {
+    return primaryResponse;
+  }
+
+  // Compatibilidade com backends mais antigos que expõem rotas em /chat/*
+  if (primaryResponse.status !== 404 && primaryResponse.status < 500) {
+    return primaryResponse;
+  }
+
+  return fetchWithRetry(buildApiPath(path, true), init, maxRetries);
 }
 
 export interface Message {
@@ -184,7 +217,7 @@ export async function getMyConversations(): Promise<Conversation[]> {
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetchWithRetry(`${API_URL}/conversations`, {
+  const response = await fetchWithChatFallback('/conversations', {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -216,7 +249,7 @@ export async function getConversationMessages(conversationId: number): Promise<M
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetchWithRetry(`${API_URL}/conversations/${conversationId}`, {
+  const response = await fetchWithChatFallback(`/conversations/${conversationId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -257,8 +290,8 @@ export async function getConversationMessagesPaginated(
   if (cursor) params.set('cursor', String(cursor));
   params.set('take', String(take));
 
-  const response = await fetchWithRetry(
-    `${API_URL}/conversations/${conversationId}/messages?${params.toString()}`,
+  const response = await fetchWithChatFallback(
+    `/conversations/${conversationId}/messages?${params.toString()}`,
     {
       method: 'GET',
       headers: {
@@ -304,7 +337,7 @@ export async function sendMessage(data: SendMessageData): Promise<SendMessageRes
 
   // Conversa existente
   if (conversationId && typeof conversationId === 'number' && !isNaN(conversationId)) {
-    response = await fetch(`${API_URL}/conversations/${conversationId}/messages`, {
+    response = await fetchWithChatFallback(`/conversations/${conversationId}/messages`, {
       method: 'POST',
       headers: requestHeaders,
       body: JSON.stringify({ content }),
@@ -345,7 +378,7 @@ export async function markMessagesAsRead(conversationId: number): Promise<void> 
     throw new Error('Token não encontrado');
   }
 
-  const response = await fetch(`${API_URL}/conversations/${conversationId}/read`, {
+  const response = await fetchWithChatFallback(`/conversations/${conversationId}/read`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -371,7 +404,7 @@ export async function getUnreadCount(): Promise<{ count: number }> {
   }
 
   try {
-    const response = await fetchWithRetry(`${API_URL}/conversations/unread/count`, {
+    const response = await fetchWithChatFallback('/conversations/unread/count', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
