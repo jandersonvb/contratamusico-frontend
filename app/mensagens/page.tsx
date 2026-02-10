@@ -12,6 +12,7 @@ import { fetchMusicianById } from "@/api/musician";
 
 export interface PendingMusician {
   id: number;
+  userId: number;
   name: string;
   profileImageUrl?: string | null;
 }
@@ -76,26 +77,27 @@ function MensagensContent() {
 
     processedMusicoRef.current = musicoParam;
 
-    // 1. Verificar se já existe conversa com esse músico
-    const existing = conversations.find(
-      (c) => c.musicianProfileId === musicianId
-    );
-
-    if (existing) {
-      // Já tem conversa, seleciona ela
-      selectConversation(existing.id);
-      setShowChat(true);
-      setPendingMusician(null);
-      router.replace("/mensagens", { scroll: false });
-      return;
-    }
-
-    // 2. Buscar dados do músico para o header da "nova conversa"
+    // Busca os dados do músico para mapear musicianProfileId -> userId
     setLoadingMusician(true);
     fetchMusicianById(musicianId)
       .then((musician) => {
+        const existing = conversations.find(
+          (c) =>
+            c.otherParty?.id === musician.userId ||
+            c.musicianProfileId === musician.id
+        );
+
+        if (existing) {
+          selectConversation(existing.id);
+          setShowChat(true);
+          setPendingMusician(null);
+          router.replace("/mensagens", { scroll: false });
+          return;
+        }
+
         setPendingMusician({
           id: musician.id,
+          userId: musician.userId,
           name: musician.name,
           profileImageUrl: musician.profileImageUrl,
         });

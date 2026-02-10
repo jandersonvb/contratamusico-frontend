@@ -229,11 +229,11 @@ export function ChatWindow({
         );
         emit("typing:stop", { conversationId });
       } else if (pendingMusician) {
-        // Nova conversa: envia com musicianProfileId para criar conversa
+        // Nova conversa: envia com recipientUserId para criar conversa
         setSendingFirst(true);
         emit(
           "message:send",
-          { musicianProfileId: pendingMusician.id, content },
+          { recipientUserId: pendingMusician.userId, content },
           async (response: unknown) => {
             const res = response as {
               success: boolean;
