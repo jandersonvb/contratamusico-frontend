@@ -156,7 +156,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
 
     // Verifica se já existe uma conversa com este músico
     const existingConversation = conversations.find(
-      (c) => c.musicianProfileId === musician.id
+      (c) => c.otherParty?.id === musician.userId || c.musicianProfileId === musician.id
     );
 
     if (existingConversation) {
@@ -173,7 +173,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
         emit(
           "message:send",
           {
-            musicianProfileId: musician.id,
+            recipientUserId: musician.userId,
             content: messageContent,
           },
           (response: unknown) => {
@@ -193,7 +193,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 // Aguarda a conversa aparecer na store (via socket) e abre
                 setTimeout(() => {
                   const conv = useChatStore.getState().conversations.find(
-                    (c) => c.musicianProfileId === musician.id
+                    (c) => c.otherParty?.id === musician.userId || c.musicianProfileId === musician.id
                   );
                   if (conv) {
                     openFloatingChat(conv.id);
@@ -209,7 +209,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
       } else {
         // Fallback REST
         const result = await sendMessage({
-          musicianId: musician.id,
+          recipientUserId: musician.userId,
           content: messageContent,
         });
         toast.success("Conversa iniciada!");
@@ -220,7 +220,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
           // Aguarda a conversa aparecer na store
           setTimeout(() => {
             const conv = useChatStore.getState().conversations.find(
-              (c) => c.musicianProfileId === musician.id
+              (c) => c.otherParty?.id === musician.userId || c.musicianProfileId === musician.id
             );
             if (conv) {
               openFloatingChat(conv.id);

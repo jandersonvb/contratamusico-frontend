@@ -63,6 +63,8 @@ export interface LastMessage {
 
 export interface Conversation {
   id: number;
+  userAId?: number;
+  userBId?: number;
   clientId?: number;
   musicianProfileId?: number;
   lastMessageAt: string;
@@ -75,7 +77,7 @@ export interface Conversation {
 }
 
 export interface SendMessageData {
-  musicianId: number;
+  recipientUserId: number;
   content: string;
 }
 
@@ -98,9 +100,13 @@ function normalizeConversation(conv: any): Conversation {
   const id = typeof conv.id === 'number' ? conv.id : parseInt(conv.id);
   const clientId = conv.clientId ? (typeof conv.clientId === 'number' ? conv.clientId : parseInt(conv.clientId)) : undefined;
   const musicianProfileId = conv.musicianProfileId ? (typeof conv.musicianProfileId === 'number' ? conv.musicianProfileId : parseInt(conv.musicianProfileId)) : undefined;
+  const userAId = conv.userAId ? (typeof conv.userAId === 'number' ? conv.userAId : parseInt(conv.userAId)) : undefined;
+  const userBId = conv.userBId ? (typeof conv.userBId === 'number' ? conv.userBId : parseInt(conv.userBId)) : undefined;
 
   const normalized = {
     id,
+    userAId,
+    userBId,
     clientId,
     musicianProfileId,
     lastMessageAt: conv.lastMessageAt,
@@ -239,14 +245,14 @@ export async function sendMessage(data: SendMessageData): Promise<Message> {
     throw new Error('Você precisa estar logado para enviar mensagens');
   }
 
-  const { musicianId, content } = data;
+  const { recipientUserId, content } = data;
 
-  // Validação do musicianId
-  if (!musicianId || typeof musicianId !== 'number' || isNaN(musicianId)) {
-    throw new Error('ID do músico inválido');
+  // Validação do recipientUserId
+  if (!recipientUserId || typeof recipientUserId !== 'number' || isNaN(recipientUserId)) {
+    throw new Error('ID do destinatário inválido');
   }
 
-  const response = await fetch(`${API_URL}/conversations/${musicianId}/messages`, {
+  const response = await fetch(`${API_URL}/conversations/${recipientUserId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -321,4 +327,3 @@ export async function getUnreadCount(): Promise<{ count: number }> {
     return { count: 0 };
   }
 }
-
