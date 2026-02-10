@@ -8,7 +8,15 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 // Singleton — apenas uma conexão WebSocket por aplicação
 let socketInstance: Socket | null = null;
-let connectionCount = 0;
+let activeToken: string | null = null;
+
+function getAuthToken() {
+  try {
+    return localStorage.getItem("token");
+  } catch {
+    return null;
+  }
+}
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
@@ -17,21 +25,24 @@ export function useSocket() {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      // Se deslogou, desconecta
+      // Se deslogou, desconecta e limpa singleton
       if (socketInstance) {
         socketInstance.disconnect();
         socketInstance = null;
-        connectionCount = 0;
       }
+      activeToken = null;
+      socketRef.current = null;
       setIsConnected(false);
       return;
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    const token = getAuthToken();
+    if (!token) {
+      setIsConnected(false);
+      return;
+    }
 
-    // Reutiliza a mesma conexão se já existir e estiver conectada
-    if (!socketInstance || socketInstance.disconnected) {
+    if (!socketInstance) {
       socketInstance = io(`${SOCKET_URL}/chat`, {
         auth: { token },
         transports: ["websocket", "polling"],
@@ -39,44 +50,48 @@ export function useSocket() {
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
+        autoConnect: true,
       });
+      activeToken = token;
+    }
 
-      socketInstance.on("connect", () => {
-        console.log("[Socket] Conectado:", socketInstance?.id);
-        setIsConnected(true);
-      });
-
-      socketInstance.on("disconnect", (reason) => {
-        console.log("[Socket] Desconectado:", reason);
-        setIsConnected(false);
-      });
-
-      socketInstance.on("connect_error", (err) => {
-        console.error("[Socket] Erro de conexão:", err.message);
-        setIsConnected(false);
-      });
-    } else {
-      setIsConnected(socketInstance.connected);
+    // Token mudou durante a sessão: força reconnect com novo auth.
+    if (activeToken !== token && socketInstance) {
+      activeToken = token;
+      socketInstance.auth = { token };
+      if (socketInstance.connected) {
+        socketInstance.disconnect();
+      }
+      socketInstance.connect();
+    } else if (socketInstance && socketInstance.disconnected) {
+      socketInstance.connect();
     }
 
     socketRef.current = socketInstance;
-    connectionCount++;
+    setIsConnected(socketInstance.connected);
+
+    const currentSocket = socketInstance;
+    const handleConnect = () => {
+      setIsConnected(true);
+    };
+    const handleDisconnect = () => {
+      setIsConnected(false);
+    };
+    const handleConnectError = (err: Error) => {
+      console.error("[Socket] Erro de conexão:", err.message);
+      setIsConnected(false);
+    };
+
+    currentSocket.on("connect", handleConnect);
+    currentSocket.on("disconnect", handleDisconnect);
+    currentSocket.on("connect_error", handleConnectError);
 
     return () => {
-      connectionCount--;
-      if (connectionCount <= 0 && socketInstance) {
-        socketInstance.disconnect();
-        socketInstance = null;
-        connectionCount = 0;
-        setIsConnected(false);
-      }
+      currentSocket.off("connect", handleConnect);
+      currentSocket.off("disconnect", handleDisconnect);
+      currentSocket.off("connect_error", handleConnectError);
     };
   }, [isLoggedIn]);
-
-  // Sincroniza ref quando o singleton muda
-  useEffect(() => {
-    socketRef.current = socketInstance;
-  });
 
   const emit = useCallback(
     <T = unknown>(event: string, data?: T, callback?: (response: unknown) => void) => {

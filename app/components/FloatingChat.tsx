@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useSocket } from "@/hooks/useSocket";
-import { getConversationMessagesPaginated, getUnreadCount } from "@/api/chat";
+import { getConversationMessagesPaginated } from "@/api/chat";
 import { MessageBubble } from "@/app/mensagens/components/MessageBubble";
 import { TypingIndicator } from "@/app/mensagens/components/TypingIndicator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,7 +42,6 @@ export function FloatingChat() {
     isLoadingMore,
     setLoadingMore,
     markConversationAsRead,
-    setUnreadCount,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -137,11 +136,7 @@ export function FloatingChat() {
     emit("conversation:join", { conversationId });
     emit("message:read", { conversationId });
 
-    // Atualiza badges localmente e re-busca o contador global
     markConversationAsRead(conversationId);
-    getUnreadCount()
-      .then((data) => setUnreadCount(data.count))
-      .catch(() => {});
 
     // Pula o fetch se as mensagens já estão em cache ou se já está buscando
     const alreadyLoaded = (messages[conversationId]?.length ?? 0) > 0;
@@ -171,7 +166,7 @@ export function FloatingChat() {
     };
     // Funções do Zustand são estáveis; emit é estável (useCallback com [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, isFloatingOpen, isOnMessagesPage]);
+  }, [conversationId, conversation?.unreadCount, isFloatingOpen, isOnMessagesPage]);
 
   // ─── Infinite scroll para cima ──────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -480,6 +475,11 @@ export function FloatingChat() {
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (!conversationId) return;
+                emit("message:read", { conversationId });
+                markConversationAsRead(conversationId);
+              }}
               placeholder="Aa"
               disabled={!isConnected || isSending}
               className="flex-1 h-9 text-sm rounded-full bg-muted/50 border-0 focus-visible:ring-1 px-3"

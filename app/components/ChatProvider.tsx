@@ -38,7 +38,7 @@ interface SocketOnlinePayload {
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const { on, isConnected } = useSocket();
+  const { on, emit, isConnected } = useSocket();
   const { isLoggedIn, user } = useUserStore();
   const { fetchFavorites, clearFavorites } = useFavoriteStore();
   const pathname = usePathname();
@@ -49,7 +49,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setUserOnline,
     markConversationAsRead,
     setUnreadCount,
+    incrementUnread,
     updateConversationLastMessage,
+    conversations,
     setConversations,
     selectedConversationId,
     unreadCount,
@@ -66,8 +68,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const userIdRef = useRef(user?.id);
   userIdRef.current = user?.id;
+  const unreadCountRef = useRef(unreadCount);
+  unreadCountRef.current = unreadCount;
+  const bootstrapAttemptRef = useRef(0);
+  const bootstrapRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Carrega conversas e unread count ao conectar
+  const joinConversations = useCallback(
+    (convs: { id: number }[]) => {
+      convs.forEach((c) => {
+        emit("conversation:join", { conversationId: c.id });
+      });
+    },
+    [emit]
+  );
+
   const loadInitialData = useCallback(async () => {
     try {
       const [convs, unread] = await Promise.all([
@@ -75,11 +90,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         getUnreadCount(),
       ]);
       setConversations(convs);
+      joinConversations(convs);
       setUnreadCount(unread.count);
+      bootstrapAttemptRef.current = 0;
+      if (bootstrapRetryRef.current) {
+        clearTimeout(bootstrapRetryRef.current);
+        bootstrapRetryRef.current = null;
+      }
     } catch (error) {
-      console.error("[ChatProvider] Erro ao carregar dados iniciais:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes("too many requests")) {
+        console.warn("[ChatProvider] Rate limit ao carregar dados iniciais.");
+      } else {
+        console.error("[ChatProvider] Erro ao carregar dados iniciais:", error);
+      }
     }
-  }, [setConversations, setUnreadCount]);
+  }, [setConversations, setUnreadCount, joinConversations]);
 
   // Carrega dados quando conecta
   useEffect(() => {
@@ -87,6 +113,43 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       loadInitialData();
     }
   }, [isLoggedIn, isConnected, loadInitialData]);
+
+  // Retry controlado do bootstrap em caso de falha transitória (ex.: 429).
+  useEffect(() => {
+    if (!isLoggedIn || !isConnected) return;
+
+    if (conversations.length > 0) return;
+    if (bootstrapAttemptRef.current >= 5) return;
+    if (bootstrapRetryRef.current) return;
+
+    bootstrapAttemptRef.current += 1;
+    bootstrapRetryRef.current = setTimeout(() => {
+      bootstrapRetryRef.current = null;
+      loadInitialData();
+    }, 3000);
+
+    return () => {
+      if (bootstrapRetryRef.current) {
+        clearTimeout(bootstrapRetryRef.current);
+        bootstrapRetryRef.current = null;
+      }
+    };
+  }, [isLoggedIn, isConnected, conversations.length, loadInitialData]);
+
+  useEffect(() => {
+    if (isLoggedIn && isConnected) return;
+    if (bootstrapRetryRef.current) {
+      clearTimeout(bootstrapRetryRef.current);
+      bootstrapRetryRef.current = null;
+    }
+    bootstrapAttemptRef.current = 0;
+  }, [isLoggedIn, isConnected]);
+
+  // Sempre que a lista de conversas mudar, garante entrada nas rooms via socket.
+  useEffect(() => {
+    if (!isLoggedIn || !isConnected || conversations.length === 0) return;
+    joinConversations(conversations);
+  }, [isLoggedIn, isConnected, conversations, joinConversations]);
 
   // Reseta as stores quando desloga
   useEffect(() => {
@@ -106,15 +169,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // Título da aba com contador de não lidas (estilo Gmail)
   useEffect(() => {
     if (typeof document === "undefined") return;
+    const baseTitle = originalTitleRef.current;
 
     if (unreadCount > 0) {
-      document.title = `(${unreadCount}) ${originalTitleRef.current}`;
+      document.title = `(${unreadCount}) ${baseTitle}`;
     } else {
-      document.title = originalTitleRef.current;
+      document.title = baseTitle;
     }
 
     return () => {
-      document.title = originalTitleRef.current;
+      document.title = baseTitle;
     };
   }, [unreadCount]);
 
@@ -141,14 +205,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       // Atualiza contador se a mensagem não é do usuário atual
       // e a conversa não está aberta (usa refs para evitar re-registro)
-      if (msg.senderId !== userIdRef.current) {
+      if (Number(msg.senderId) !== Number(userIdRef.current)) {
         const isOnChatPage = pathnameRef.current === "/mensagens";
         const isConversationOpen = isOnChatPage && msg.conversationId === selectedConversationIdRef.current;
 
         if (!isConversationOpen) {
-          getUnreadCount()
-            .then((data) => setUnreadCount(data.count))
-            .catch(() => {});
+          const nextUnread = incrementUnread(msg.conversationId);
+          unreadCountRef.current = nextUnread;
 
           // Notificação sonora
           playNotificationSound();
@@ -192,8 +255,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // Nova conversa criada (o outro iniciou uma conversa comigo)
     const offNewConv = on("conversation:new", () => {
       getMyConversations()
-        .then(setConversations)
-        .catch(console.error);
+        .then((convs) => {
+          setConversations(convs);
+          joinConversations(convs);
+        })
+        .catch(() => {});
     });
 
     return () => {

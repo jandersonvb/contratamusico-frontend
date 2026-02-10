@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { useUserStore } from "@/lib/stores/userStore";
-import { getConversationMessagesPaginated, getMyConversations, getUnreadCount } from "@/api/chat";
+import { getConversationMessagesPaginated, getMyConversations } from "@/api/chat";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { TypingIndicator } from "./TypingIndicator";
@@ -32,6 +32,8 @@ export function ChatWindow({
     messages,
     setMessages,
     setConversations,
+    addMessage,
+    removeMessage,
     prependMessages,
     pagination,
     setPagination,
@@ -42,7 +44,7 @@ export function ChatWindow({
     setLoadingMore,
     onlineUsers,
     markConversationAsRead,
-    setUnreadCount,
+    updateConversationLastMessage,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -95,11 +97,7 @@ export function ChatWindow({
     emit("conversation:join", { conversationId });
     emit("message:read", { conversationId });
 
-    // Atualiza badges localmente e re-busca o contador global
     markConversationAsRead(conversationId);
-    getUnreadCount()
-      .then((data) => setUnreadCount(data.count))
-      .catch(() => {});
 
     // Pula o fetch se as mensagens já estão em cache ou se já está buscando
     const alreadyLoaded = (messages[conversationId]?.length ?? 0) > 0;
@@ -129,7 +127,7 @@ export function ChatWindow({
     };
     // Funções do Zustand são estáveis; emit é estável (useCallback com [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId]);
+  }, [conversationId, conversation?.unreadCount]);
 
   // ─── Carregar mais antigas (infinite scroll para cima) ──────────
   const loadMore = useCallback(async () => {
@@ -204,6 +202,19 @@ export function ChatWindow({
   const handleSend = useCallback(
     (content: string) => {
       if (conversationId) {
+        const optimisticId = -Date.now();
+        const createdAt = new Date().toISOString();
+
+        addMessage(conversationId, {
+          id: optimisticId,
+          conversationId,
+          content,
+          senderId: user?.id ?? 0,
+          isRead: true,
+          createdAt,
+        });
+        updateConversationLastMessage(conversationId, content, createdAt);
+
         // Conversa existente: fluxo normal
         emit(
           "message:send",
@@ -212,6 +223,7 @@ export function ChatWindow({
             const res = response as { success: boolean; error?: string };
             if (!res.success) {
               console.error("[Chat] Erro ao enviar:", res.error);
+              removeMessage(conversationId, optimisticId);
             }
           }
         );
@@ -245,7 +257,17 @@ export function ChatWindow({
         );
       }
     },
-    [conversationId, pendingMusician, emit, onConversationCreated, setConversations]
+    [
+      conversationId,
+      pendingMusician,
+      emit,
+      onConversationCreated,
+      setConversations,
+      addMessage,
+      removeMessage,
+      updateConversationLastMessage,
+      user?.id,
+    ]
   );
 
   // Indicador de digitação
@@ -258,6 +280,12 @@ export function ChatWindow({
     },
     [conversationId, emit]
   );
+
+  const handleFocusInput = useCallback(() => {
+    if (!conversationId) return;
+    emit("message:read", { conversationId });
+    markConversationAsRead(conversationId);
+  }, [conversationId, emit, markConversationAsRead]);
 
   // Marca como lida quando o chat está focado
   useEffect(() => {
@@ -408,6 +436,7 @@ export function ChatWindow({
       <ChatInput
         onSend={handleSend}
         onTyping={handleTyping}
+        onFocusInput={handleFocusInput}
         disabled={!isConnected || sendingFirst}
       />
     </div>

@@ -8,10 +8,11 @@ import { Send, Loader2 } from "lucide-react";
 interface ChatInputProps {
   onSend: (content: string) => void;
   onTyping: (isTyping: boolean) => void;
+  onFocusInput?: () => void;
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, onTyping, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onTyping, onFocusInput, disabled }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -65,6 +66,7 @@ export function ChatInput({ onSend, onTyping, disabled }: ChatInputProps) {
       <Input
         value={value}
         onChange={handleChange}
+        onFocus={onFocusInput}
         onKeyDown={handleKeyDown}
         placeholder="Digite sua mensagem..."
         disabled={disabled || isSending}
