@@ -37,7 +37,7 @@ interface SocketOnlinePayload {
   userId: number;
 }
 
-function normalizeSocketPayload<T extends Record<string, unknown>>(
+function normalizeSocketPayload<T extends object>(
   payload: unknown,
   keys: string[] = ["data", "message", "payload"]
 ): T | null {

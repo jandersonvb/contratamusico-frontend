@@ -63,6 +63,8 @@ export interface LastMessage {
 
 export interface Conversation {
   id: number;
+  userAId?: number;
+  userBId?: number;
   clientId?: number;
   musicianProfileId?: number;
   lastMessageAt: string;
@@ -75,7 +77,8 @@ export interface Conversation {
 }
 
 export interface SendMessageData {
-  musicianId: number;
+  recipientUserId?: number;
+  musicianProfileId?: number;
   content: string;
 }
 
@@ -88,35 +91,66 @@ export interface PaginatedMessagesResponse {
 /**
  * Normaliza os dados da conversa para garantir formato consistente
  */
-function normalizeConversation(conv: any): Conversation {
+function normalizeConversation(conv: Record<string, unknown>): Conversation {
+  const rawLastMessage = conv.lastMessage;
+  const rawOtherParty = conv.otherParty as ConversationParticipant | undefined;
+
   // Normaliza lastMessage se for objeto
-  const lastMessageContent = typeof conv.lastMessage === 'object' && conv.lastMessage?.content
-    ? conv.lastMessage.content
-    : (typeof conv.lastMessage === 'string' ? conv.lastMessage : '');
+  const lastMessageContent =
+    rawLastMessage &&
+    typeof rawLastMessage === "object" &&
+    "content" in rawLastMessage &&
+    typeof (rawLastMessage as { content?: unknown }).content === "string"
+      ? (rawLastMessage as { content: string }).content
+      : typeof rawLastMessage === "string"
+      ? rawLastMessage
+      : "";
 
   // Garante que IDs são números
-  const id = typeof conv.id === 'number' ? conv.id : parseInt(conv.id);
-  const clientId = conv.clientId ? (typeof conv.clientId === 'number' ? conv.clientId : parseInt(conv.clientId)) : undefined;
-  const musicianProfileId = conv.musicianProfileId ? (typeof conv.musicianProfileId === 'number' ? conv.musicianProfileId : parseInt(conv.musicianProfileId)) : undefined;
+  const id = typeof conv.id === "number" ? conv.id : parseInt(String(conv.id));
+  const clientId = conv.clientId
+    ? typeof conv.clientId === "number"
+      ? conv.clientId
+      : parseInt(String(conv.clientId))
+    : undefined;
+  const musicianProfileId = conv.musicianProfileId
+    ? typeof conv.musicianProfileId === "number"
+      ? conv.musicianProfileId
+      : parseInt(String(conv.musicianProfileId))
+    : undefined;
+  const userAId = conv.userAId
+    ? typeof conv.userAId === "number"
+      ? conv.userAId
+      : parseInt(String(conv.userAId))
+    : undefined;
+  const userBId = conv.userBId
+    ? typeof conv.userBId === "number"
+      ? conv.userBId
+      : parseInt(String(conv.userBId))
+    : undefined;
+  const unreadCount =
+    typeof conv.unreadCount === "number" ? conv.unreadCount : undefined;
 
   const normalized = {
     id,
+    userAId,
+    userBId,
     clientId,
     musicianProfileId,
-    lastMessageAt: conv.lastMessageAt,
-    createdAt: conv.createdAt,
-    unreadCount: conv.unreadCount,
-    clientName: conv.otherParty?.type === 'client' ? conv.otherParty.name : conv.clientName,
-    musicianName: conv.otherParty?.type === 'musician' ? conv.otherParty.name : conv.musicianName,
+    lastMessageAt: String(conv.lastMessageAt ?? ''),
+    createdAt: String(conv.createdAt ?? ''),
+    unreadCount,
+    clientName: rawOtherParty?.type === 'client' ? rawOtherParty.name : (conv.clientName as string | undefined),
+    musicianName: rawOtherParty?.type === 'musician' ? rawOtherParty.name : (conv.musicianName as string | undefined),
     lastMessage: lastMessageContent,
-    otherParty: conv.otherParty,
+    otherParty: rawOtherParty,
   };
   
   console.log('✅ Conversa normalizada:', {
     id: normalized.id,
     musicianProfileId: normalized.musicianProfileId,
     clientId: normalized.clientId,
-    otherPartyName: conv.otherParty?.name
+    otherPartyName: rawOtherParty?.name
   });
   
   return normalized;
@@ -149,7 +183,9 @@ export async function getMyConversations(): Promise<Conversation[]> {
   const data = await response.json();
   
   // Normaliza cada conversa
-  return Array.isArray(data) ? data.map(normalizeConversation) : [];
+  return Array.isArray(data)
+    ? data.map((conversation) => normalizeConversation(conversation as Record<string, unknown>))
+    : [];
 }
 
 /**
@@ -239,14 +275,15 @@ export async function sendMessage(data: SendMessageData): Promise<Message> {
     throw new Error('Você precisa estar logado para enviar mensagens');
   }
 
-  const { musicianId, content } = data;
+  const { recipientUserId, musicianProfileId, content } = data;
+  const targetId = recipientUserId ?? musicianProfileId;
 
-  // Validação do musicianId
-  if (!musicianId || typeof musicianId !== 'number' || isNaN(musicianId)) {
-    throw new Error('ID do músico inválido');
+  // Validação do destino (novo: recipientUserId, legado: musicianProfileId)
+  if (!targetId || typeof targetId !== 'number' || isNaN(targetId)) {
+    throw new Error('ID do destinatário inválido');
   }
 
-  const response = await fetch(`${API_URL}/conversations/${musicianId}/messages`, {
+  const response = await fetch(`${API_URL}/conversations/${targetId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -321,4 +358,3 @@ export async function getUnreadCount(): Promise<{ count: number }> {
     return { count: 0 };
   }
 }
-
