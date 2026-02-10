@@ -93,6 +93,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   unreadCountRef.current = unreadCount;
   const bootstrapAttemptRef = useRef(0);
   const bootstrapRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldRetryBootstrapRef = useRef(true);
 
   // Carrega conversas e unread count ao conectar
   const joinConversations = useCallback(
@@ -114,13 +115,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       joinConversations(convs);
       setUnreadCount(unread.count);
       bootstrapAttemptRef.current = 0;
+      shouldRetryBootstrapRef.current = true;
       if (bootstrapRetryRef.current) {
         clearTimeout(bootstrapRetryRef.current);
         bootstrapRetryRef.current = null;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes("too many requests")) {
+      const normalizedMessage = message.toLowerCase();
+      const isTransientError =
+        normalizedMessage.includes("too many requests") ||
+        normalizedMessage.includes("failed to fetch") ||
+        normalizedMessage.includes("network");
+
+      shouldRetryBootstrapRef.current = isTransientError;
+
+      if (normalizedMessage.includes("too many requests")) {
         console.warn("[ChatProvider] Rate limit ao carregar dados iniciais.");
       } else {
         console.error("[ChatProvider] Erro ao carregar dados iniciais:", error);
@@ -140,6 +150,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (!isLoggedIn || !isConnected) return;
 
     if (conversations.length > 0) return;
+    if (!shouldRetryBootstrapRef.current) return;
     if (bootstrapAttemptRef.current >= 5) return;
     if (bootstrapRetryRef.current) return;
 
@@ -164,6 +175,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       bootstrapRetryRef.current = null;
     }
     bootstrapAttemptRef.current = 0;
+    shouldRetryBootstrapRef.current = true;
   }, [isLoggedIn, isConnected]);
 
   // Sempre que a lista de conversas mudar, garante entrada nas rooms via socket.
