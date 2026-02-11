@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DynamicFAQ } from "./components/DynamicFAQ";
-import { ScheduleCallDialog } from "./components/ScheduleCallDialog";
 
 /**
  * Contact page replicating the structure of contato.html. It features
@@ -35,7 +34,9 @@ import { ScheduleCallDialog } from "./components/ScheduleCallDialog";
  * notification to mimic a successful send action.
  */
 export default function ContatoPage() {
-  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const googleMapsUrl =
+    "https://www.google.com/maps/search/?api=1&query=Avenida+Padre+Lourenco+da+Costa,+3415,+Morro+Grande,+Itajuba,+MG,+37502-710";
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
@@ -268,14 +269,6 @@ export default function ContatoPage() {
                     <span className="text-xs text-muted-foreground block mb-2">
                       Seg–Sex: 9h às 18h
                     </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8"
-                      onClick={() => setIsScheduleOpen(true)}
-                    >
-                      Agendar uma ligação
-                    </Button>
                   </div>
                 </div>
                 {/* WhatsApp */}
@@ -363,15 +356,14 @@ export default function ContatoPage() {
                 <p>Itajubá/MG – CEP: 37502-710</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">Ver no Google Maps</Button>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
+              <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
+                Ver no Google Maps
+              </a>
+            </Button>
           </div>
         </div>
       </section>
-
-      <ScheduleCallDialog 
-        isOpen={isScheduleOpen} 
-        onClose={() => setIsScheduleOpen(false)} 
-      />
     </div>
   );
 }

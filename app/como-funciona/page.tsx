@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -109,23 +108,6 @@ export default function ComoFuncionaPage() {
         </div>
       </section>
 
-      {/* Video Tutorial Section (Placeholder) */}
-      <section className="bg-muted/30 py-10 sm:py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 sm:mb-8">Veja na Prática</h2>
-          <div className="max-w-4xl mx-auto aspect-video bg-slate-900 rounded-lg sm:rounded-xl flex items-center justify-center shadow-xl sm:shadow-2xl relative overflow-hidden group cursor-pointer">
-            {/* Placeholder visual */}
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-50 group-hover:opacity-40 transition-opacity" />
-            <div className="relative z-10 flex flex-col items-center text-white">
-              <PlayCircle className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 mb-2 sm:mb-4 opacity-90 group-hover:scale-110 transition-transform" />
-              <span className="text-sm sm:text-base md:text-lg font-semibold">
-                Assistir Tutorial Completo
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Benefits Section */}
       <section className="py-10 sm:py-16 container mx-auto px-4">
         <div className="text-center mb-8 sm:mb-12">
@@ -180,4 +162,3 @@ export default function ComoFuncionaPage() {
     </>
   );
 }
-

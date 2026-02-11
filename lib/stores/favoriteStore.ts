@@ -3,6 +3,15 @@ import { devtools } from 'zustand/middleware';
 import { addFavorite, removeFavorite, getMyFavorites } from '@/api/favorite';
 import type { Favorite } from '@/api/favorite';
 
+const FAVORITES_LAST_SEEN_KEY = 'favorites:lastSeenAt';
+
+function getInitialLastSeenAt(): number {
+  if (typeof window === 'undefined') return 0;
+  const raw = window.localStorage.getItem(FAVORITES_LAST_SEEN_KEY);
+  const parsed = raw ? Number(raw) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 interface FavoriteState {
   /** Lista completa de favoritos do usuário */
   favorites: Favorite[];
@@ -12,6 +21,8 @@ interface FavoriteState {
   isLoading: boolean;
   /** IDs de músicos sendo toggled (para loading individual) */
   togglingIds: Set<number>;
+  /** Timestamp do último momento em que a lista de favoritos foi visualizada */
+  lastSeenAt: number;
 
   // Actions
   /** Carrega todos os favoritos do backend */
@@ -24,6 +35,10 @@ interface FavoriteState {
   isToggling: (musicianProfileId: number) => boolean;
   /** Número total de favoritos */
   count: () => number;
+  /** Marca os favoritos atuais como visualizados */
+  markFavoritesAsSeen: () => void;
+  /** Indica se existem favoritos novos desde a última visualização */
+  hasUnseenFavorites: () => boolean;
   /** Limpa todos os favoritos (usado no logout) */
   clearFavorites: () => void;
 }
@@ -35,6 +50,7 @@ export const useFavoriteStore = create<FavoriteState>()(
       favoriteIds: new Set(),
       isLoading: false,
       togglingIds: new Set(),
+      lastSeenAt: getInitialLastSeenAt(),
 
       fetchFavorites: async () => {
         // Evita chamadas duplicadas
@@ -137,6 +153,29 @@ export const useFavoriteStore = create<FavoriteState>()(
         return get().favoriteIds.size;
       },
 
+      markFavoritesAsSeen: () => {
+        const { favorites } = get();
+        const latestFavoriteAt = favorites.reduce((latest, favorite) => {
+          const createdAt = new Date(favorite.createdAt).getTime();
+          return Number.isFinite(createdAt) ? Math.max(latest, createdAt) : latest;
+        }, 0);
+
+        set({ lastSeenAt: latestFavoriteAt }, false, 'favorites/markSeen');
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(FAVORITES_LAST_SEEN_KEY, String(latestFavoriteAt));
+        }
+      },
+
+      hasUnseenFavorites: () => {
+        const { favorites, lastSeenAt } = get();
+        const latestFavoriteAt = favorites.reduce((latest, favorite) => {
+          const createdAt = new Date(favorite.createdAt).getTime();
+          return Number.isFinite(createdAt) ? Math.max(latest, createdAt) : latest;
+        }, 0);
+        return latestFavoriteAt > lastSeenAt;
+      },
+
       clearFavorites: () => {
         set(
           {
@@ -144,10 +183,15 @@ export const useFavoriteStore = create<FavoriteState>()(
             favoriteIds: new Set(),
             isLoading: false,
             togglingIds: new Set(),
+            lastSeenAt: 0,
           },
           false,
           'favorites/cleared'
         );
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(FAVORITES_LAST_SEEN_KEY);
+        }
       },
     }),
     {

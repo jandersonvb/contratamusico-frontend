@@ -17,8 +17,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoggedIn, isLoading: userLoading } = useUserStore();
   const { unreadCount } = useChatStore();
-  const { favorites, favoriteIds } = useFavoriteStore();
+  const { favorites, favoriteIds, hasUnseenFavorites, markFavoritesAsSeen } = useFavoriteStore();
   const favoritesCount = favoriteIds.size;
+  const favoritesHasBadge = hasUnseenFavorites();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -64,7 +65,7 @@ export default function DashboardPage() {
     { label: "Total de contratações", value: bookings.length, icon: Users2, href: undefined as string | undefined, highlight: false },
     { label: "Mensagens não lidas", value: unreadCount, icon: MessageSquare, href: "/mensagens", highlight: unreadCount > 0 },
     { label: "Próximos eventos", value: bookings.filter(b => b.status === "confirmado").length, icon: CalendarDays, href: undefined as string | undefined, highlight: false },
-    { label: "Favoritos", value: favoritesCount, icon: Heart, href: "/favoritos", highlight: favoritesCount > 0 },
+    { label: "Favoritos", value: favoritesCount, icon: Heart, href: "/favoritos", highlight: favoritesHasBadge },
   ];
 
   if (userLoading || isLoadingBookings) {
@@ -106,7 +107,16 @@ export default function DashboardPage() {
                   ? "border-primary bg-primary/5 ring-1 ring-primary/20 hover:bg-primary/10"
                   : ""
               } ${s.href ? "cursor-pointer hover:shadow-md" : ""}`}
-              onClick={s.href ? () => router.push(s.href!) : undefined}
+              onClick={
+                s.href
+                  ? () => {
+                      if (s.href === "/favoritos") {
+                        markFavoritesAsSeen();
+                      }
+                      router.push(s.href!);
+                    }
+                  : undefined
+              }
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium leading-tight">{s.label}</CardTitle>
@@ -182,7 +192,7 @@ export default function DashboardPage() {
               Favoritos
             </CardTitle>
             {favoritesCount > 0 && (
-              <Link href="/favoritos">
+              <Link href="/favoritos" onClick={markFavoritesAsSeen}>
                 <Button variant="ghost" size="sm" className="text-xs">
                   Ver todos
                 </Button>
@@ -243,7 +253,7 @@ export default function DashboardPage() {
               })
             )}
             {favorites.length > 4 && (
-              <Link href="/favoritos">
+              <Link href="/favoritos" onClick={markFavoritesAsSeen}>
                 <Button variant="outline" className="w-full text-sm">
                   Ver todos ({favoritesCount})
                 </Button>

@@ -2,7 +2,6 @@ import {
   Search,
   UserCheck,
   MessageCircle,
-  CreditCard,
   Music,
   Calendar,
   Star,
@@ -33,10 +32,10 @@ export const howItWorksClient = [
     icon: MessageCircle,
   },
   {
-    title: "Pagamento Seguro",
+    title: "Feche os Detalhes",
     description:
-      "Realize o pagamento com segurança e garantia de devolução em caso de problemas.",
-    icon: CreditCard,
+      "Alinhe diretamente com o músico repertório, horário, local e condições para o evento.",
+    icon: Calendar,
   },
 ];
 
@@ -71,7 +70,7 @@ export const benefits = [
   {
     title: "Segurança Garantida",
     description:
-      "Todos os músicos passam por verificação e os pagamentos são protegidos.",
+      "Todos os músicos passam por verificação e você contrata com mais confiança.",
     icon: Shield,
   },
   {
@@ -98,7 +97,7 @@ export const faqComoFunciona = [
   {
     question: "Quanto custa para usar a plataforma?",
     answer:
-      "Para clientes, o uso da plataforma é gratuito. Você paga apenas o valor negociado com o músico. Para músicos, oferecemos planos gratuitos e premium com funcionalidades extras.",
+      "A plataforma é gratuita para usuários. Também oferecemos plano gratuito e planos com recursos adicionais, cada um com características específicas para diferentes necessidades.",
   },
   {
     question: "Os músicos são verificados?",
@@ -106,14 +105,13 @@ export const faqComoFunciona = [
       "Sim, realizamos uma verificação básica de identidade e incentivamos a verificação completa com envio de documentos e portfólio comprovado.",
   },
   {
-    question: "Como funciona o pagamento?",
+    question: "A plataforma processa pagamentos?",
     answer:
-      "O pagamento pode ser feito via cartão de crédito ou PIX. O valor fica retido na plataforma e é liberado para o músico após a realização do evento.",
+      "Não. A negociação e as condições da contratação são combinadas diretamente entre cliente e músico.",
   },
   {
     question: "E se o músico cancelar?",
     answer:
-      "Em caso de cancelamento por parte do músico, garantimos o reembolso integral do valor pago e auxiliamos na busca por um substituto.",
+      "Em caso de cancelamento por parte do músico, nossa equipe auxilia você na busca por um substituto.",
   },
 ];
-
