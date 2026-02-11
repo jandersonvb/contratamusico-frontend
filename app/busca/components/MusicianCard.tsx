@@ -240,8 +240,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
     return (
       <Link href={`/musico/${musician.id}`} className="block group">
         <Card className="border p-3 sm:p-4 transition-all duration-300 hover:shadow-md">
-          <div className="flex gap-3 sm:gap-4">
-            <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+          <div className="flex flex-col min-[360px]:flex-row gap-3 sm:gap-4">
+            <div className="relative h-36 w-full min-[360px]:h-20 min-[360px]:w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
               <Image
                 src={currentPhotoUrl}
                 alt={`Foto de ${musician.name}`}
@@ -315,8 +315,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
                   onClick={handleChatClick}
                   aria-label={`Enviar mensagem para ${musician.name}`}
                 >
-                  <MessageCircle className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Mensagem</span>
+                  <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
+                  <span className="hidden min-[360px]:inline">Mensagem</span>
                 </Button>
               </div>
             </div>
@@ -396,8 +396,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
               onClick={handleChatClick}
               aria-label={`Enviar mensagem para ${musician.name}`}
             >
-              <MessageCircle className="h-4 w-4 mr-1.5" />
-              Mensagem
+              <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
+              <span className="hidden min-[360px]:inline">Mensagem</span>
             </Button>
           </div>
         </div>
