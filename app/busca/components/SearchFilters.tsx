@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -13,29 +13,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import {
   Calendar as CalendarIcon,
+  Check,
   DollarSign,
+  Filter,
   Guitar,
-  MapPin,
   Music,
   Star,
   X,
 } from "lucide-react";
-import { useLocationStore } from "@/lib/stores/locationStore";
 import { useInstrumentStore } from "@/lib/stores/instrumentStore";
 import { useGenreStore } from "@/lib/stores/genreStore";
 import { SearchFilters as SearchFiltersType } from "@/lib/types/search";
+import { cn } from "@/lib/utils";
+import { countActiveFilters } from "@/lib/search/filters";
 
 interface SearchFiltersProps {
   filters: SearchFiltersType;
-  setFilters: (filters: SearchFiltersType) => void;
+  setFilters: (filters: Partial<SearchFiltersType>) => void;
   clearFilters: () => void;
+  mode?: "sidebar" | "panel";
+  className?: string;
 }
 
 /**
@@ -48,25 +46,22 @@ export function SearchFilters({
   filters,
   setFilters,
   clearFilters,
+  mode = "sidebar",
+  className,
 }: SearchFiltersProps) {
+  const isPanel = mode === "panel";
+  const [instrumentQuery, setInstrumentQuery] = useState("");
+  const [genreQuery, setGenreQuery] = useState("");
+
   // Stores
-  const { states, cities, isLoadingStates, isLoadingCities, fetchStates, fetchCities } = useLocationStore();
   const { instruments, isLoading: isLoadingInstruments, fetchInstruments } = useInstrumentStore();
   const { genres, isLoading: isLoadingGenres, fetchGenres } = useGenreStore();
 
   // Carrega dados iniciais
   useEffect(() => {
-    fetchStates();
     fetchInstruments();
     fetchGenres();
-  }, [fetchStates, fetchInstruments, fetchGenres]);
-
-  // Quando o estado muda, busca as cidades
-  useEffect(() => {
-    if (filters.state && filters.state !== "all") {
-      fetchCities(filters.state);
-    }
-  }, [filters.state, fetchCities]);
+  }, [fetchInstruments, fetchGenres]);
 
   // Helper to toggle a value inside an array filter (instruments, genres, availability)
   const toggleArrayValue = (key: keyof SearchFiltersType, value: string) => {
@@ -79,15 +74,54 @@ export function SearchFilters({
     });
   };
 
+  const hasPricePreset = (min: string, max: string) =>
+    filters.priceMin === min && filters.priceMax === max;
+
+  const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
+
+  const filteredInstruments = useMemo(() => {
+    const query = instrumentQuery.trim().toLowerCase();
+    if (!query) return instruments;
+    return instruments.filter((instrument) =>
+      instrument.name.toLowerCase().includes(query)
+    );
+  }, [instruments, instrumentQuery]);
+
+  const filteredGenres = useMemo(() => {
+    const query = genreQuery.trim().toLowerCase();
+    if (!query) return genres;
+    return genres.filter((genre) => genre.name.toLowerCase().includes(query));
+  }, [genres, genreQuery]);
+
   return (
-    <aside className="w-full lg:w-72 shrink-0 lg:border-r lg:pr-6 mb-4 lg:mb-0">
-      <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <h3 className="text-base sm:text-lg font-semibold">Filtros</h3>
+    <aside
+      className={cn(
+        "w-full shrink-0",
+        mode === "sidebar" && "lg:w-80 lg:border-r lg:pr-6 mb-4 lg:mb-0",
+        className
+      )}
+    >
+      {!isPanel && (
+        <div className="rounded-xl border bg-card/60 backdrop-blur-sm p-3 sm:p-4 mb-3 sm:mb-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-semibold inline-flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filtros
+            </h3>
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+              {activeFiltersCount} ativos
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className={cn("flex items-center justify-end mb-3 sm:mb-4", isPanel && "mb-2")}>
         <Button
           variant="ghost"
           size="sm"
           aria-label="Limpar filtros"
           onClick={clearFilters}
+          disabled={activeFiltersCount === 0}
           className="h-8 px-2 text-xs sm:text-sm"
         >
           <X className="h-4 w-4 mr-1" />
@@ -96,81 +130,26 @@ export function SearchFilters({
       </div>
       <Accordion
         type="multiple"
-        defaultValue={[
-          "location",
-          "instruments",
-          "genres",
-          "price",
-          "rating",
-          "availability",
-        ]}
+        defaultValue={[]}
         className="space-y-2"
       >
-        {/* Localização */}
-        <AccordionItem value="location">
-          <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
-            <MapPin className="h-4 w-4" /> Localização
-          </AccordionTrigger>
-          <AccordionContent className="space-y-2 pt-2">
-            <Select
-              value={filters.state}
-              onValueChange={(value) => {
-                setFilters({ ...filters, state: value, city: "" });
-              }}
-            >
-              <SelectTrigger className="w-full">
-                {isLoadingStates 
-                  ? "Carregando..." 
-                  : filters.state && filters.state !== "all"
-                    ? states.find(s => s.sigla === filters.state)?.nome || filters.state
-                    : "Todos os estados"
-                }
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os estados</SelectItem>
-                {states.map((state) => (
-                  <SelectItem key={state.sigla} value={state.sigla}>
-                    {state.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {filters.state && filters.state !== "all" && (
-              <Select
-                value={filters.city || "all"}
-                onValueChange={(value) => setFilters({ ...filters, city: value === "all" ? "" : value })}
-              >
-                <SelectTrigger className="w-full">
-                  {isLoadingCities
-                    ? "Carregando..."
-                    : filters.city || "Todas as cidades"
-                  }
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as cidades</SelectItem>
-                  {cities.map((city) => (
-                    <SelectItem key={city.id} value={city.nome}>
-                      {city.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
         {/* Instrumentos */}
         <AccordionItem value="instruments">
           <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
             <Guitar className="h-4 w-4" /> Instrumentos
           </AccordionTrigger>
-          <AccordionContent className="pt-2">
+          <AccordionContent className="pt-2 space-y-2">
+            <Input
+              value={instrumentQuery}
+              onChange={(e) => setInstrumentQuery(e.target.value)}
+              placeholder="Filtrar instrumentos..."
+              className="h-9"
+            />
             {isLoadingInstruments ? (
               <p className="text-sm text-muted-foreground">Carregando...</p>
             ) : (
               <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                {instruments.map((instrument) => (
+                {filteredInstruments.map((instrument) => (
                   <Label
                     key={instrument.slug}
                     className="flex items-center gap-2 text-sm cursor-pointer"
@@ -185,6 +164,9 @@ export function SearchFilters({
                     <span>{instrument.name}</span>
                   </Label>
                 ))}
+                {!filteredInstruments.length && (
+                  <p className="text-xs text-muted-foreground">Nenhum instrumento encontrado.</p>
+                )}
               </div>
             )}
           </AccordionContent>
@@ -195,12 +177,18 @@ export function SearchFilters({
           <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
             <Music className="h-4 w-4" /> Estilos Musicais
           </AccordionTrigger>
-          <AccordionContent className="pt-2">
+          <AccordionContent className="pt-2 space-y-2">
+            <Input
+              value={genreQuery}
+              onChange={(e) => setGenreQuery(e.target.value)}
+              placeholder="Filtrar estilos..."
+              className="h-9"
+            />
             {isLoadingGenres ? (
               <p className="text-sm text-muted-foreground">Carregando...</p>
             ) : (
               <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                {genres.map((genre) => (
+                {filteredGenres.map((genre) => (
                   <Label
                     key={genre.slug}
                     className="flex items-center gap-2 text-sm cursor-pointer"
@@ -215,6 +203,9 @@ export function SearchFilters({
                     <span>{genre.name}</span>
                   </Label>
                 ))}
+                {!filteredGenres.length && (
+                  <p className="text-xs text-muted-foreground">Nenhum estilo encontrado.</p>
+                )}
               </div>
             )}
           </AccordionContent>
@@ -256,7 +247,7 @@ export function SearchFilters({
               ].map((preset, idx) => (
                 <Button
                   key={idx}
-                  variant="outline"
+                  variant={hasPricePreset(preset.min, preset.max) ? "default" : "outline"}
                   size="sm"
                   onClick={() =>
                     setFilters({
@@ -266,6 +257,7 @@ export function SearchFilters({
                     })
                   }
                 >
+                  {hasPricePreset(preset.min, preset.max) && <Check className="h-3 w-3 mr-1" />}
                   {preset.label}
                 </Button>
               ))}
@@ -319,19 +311,6 @@ export function SearchFilters({
             <CalendarIcon className="h-4 w-4" /> Disponibilidade
           </AccordionTrigger>
           <AccordionContent className="pt-2 space-y-2">
-            <div className="space-y-1">
-              <Label htmlFor="eventDate" className="text-sm">
-                Data do Evento
-              </Label>
-              <Input
-                id="eventDate"
-                type="date"
-                value={filters.date}
-                onChange={(e) =>
-                  setFilters({ ...filters, date: e.target.value })
-                }
-              />
-            </div>
             <div className="flex flex-col gap-2">
               {[
                 { value: "weekends", label: "Fins de semana" },

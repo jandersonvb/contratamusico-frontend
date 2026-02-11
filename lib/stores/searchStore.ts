@@ -3,6 +3,9 @@ import { devtools } from 'zustand/middleware';
 import { searchMusicians } from '@/api/musician';
 import { SearchState, SearchFilters, defaultFilters, SearchMusiciansParams } from '../types/search';
 
+let activeSearchController: AbortController | null = null;
+let activeSearchRequestId = 0;
+
 export const useSearchStore = create<SearchState>()(
   devtools(
     (set, get) => ({
@@ -50,7 +53,9 @@ export const useSearchStore = create<SearchState>()(
       setPage: (page: number) => {
         set(
           (state) => ({
-            pagination: state.pagination ? { ...state.pagination, page } : null,
+            pagination: state.pagination
+              ? { ...state.pagination, page }
+              : { page, limit: 12, total: 0, totalPages: 1, hasMore: false },
           }),
           false,
           'search/setPage'
@@ -59,6 +64,12 @@ export const useSearchStore = create<SearchState>()(
 
       search: async () => {
         const { filters, sortBy, sortOrder, pagination } = get();
+        const requestId = ++activeSearchRequestId;
+
+        if (activeSearchController) {
+          activeSearchController.abort();
+        }
+        activeSearchController = new AbortController();
 
         set({ isLoading: true, error: null }, false, 'search/searchStart');
 
@@ -98,7 +109,11 @@ export const useSearchStore = create<SearchState>()(
           // Busca textual
           if (filters.search) params.search = filters.search;
 
-          const response = await searchMusicians(params);
+          const response = await searchMusicians(params, {
+            signal: activeSearchController.signal,
+          });
+
+          if (requestId !== activeSearchRequestId) return;
 
           set(
             {
@@ -110,8 +125,18 @@ export const useSearchStore = create<SearchState>()(
             'search/searchSuccess'
           );
         } catch (error) {
+          if (requestId !== activeSearchRequestId) return;
+
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+          }
+
           const message = error instanceof Error ? error.message : 'Erro ao buscar músicos';
           set({ error: message, isLoading: false, musicians: [] }, false, 'search/searchError');
+        } finally {
+          if (requestId === activeSearchRequestId) {
+            activeSearchController = null;
+          }
         }
       },
     }),
@@ -121,4 +146,3 @@ export const useSearchStore = create<SearchState>()(
     }
   )
 );
-

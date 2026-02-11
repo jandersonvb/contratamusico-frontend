@@ -39,7 +39,10 @@ function buildQueryString(params: SearchMusiciansParams): string {
 /**
  * Busca músicos com filtros e paginação
  */
-export async function searchMusicians(params: SearchMusiciansParams = {}): Promise<PaginatedMusiciansResponse> {
+export async function searchMusicians(
+  params: SearchMusiciansParams = {},
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedMusiciansResponse> {
   const queryString = buildQueryString(params);
   const url = `${API_URL}/musicians${queryString ? `?${queryString}` : ''}`;
 
@@ -50,7 +53,7 @@ export async function searchMusicians(params: SearchMusiciansParams = {}): Promi
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers, signal: options?.signal });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
@@ -99,4 +102,3 @@ export async function fetchMusicianById(id: number): Promise<MusicianProfile> {
 
   return response.json();
 }
-
