@@ -60,7 +60,7 @@ export async function getMyBookings(): Promise<Booking[]> {
   }
 
   try {
-    const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+    const response = await fetch(`${API_URL}/bookings`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -136,4 +136,3 @@ export async function updateBookingStatus(
 
   return response.json();
 }
-

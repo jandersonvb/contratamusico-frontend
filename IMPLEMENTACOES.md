@@ -153,7 +153,7 @@ export * from './genre';       // Gêneros
 | Músico por ID | `GET /musicians/:id` | ✅ |
 | Músicos destaque | `GET /musicians/featured` | ✅ |
 | Criar booking | `POST /bookings` | ✅ |
-| Meus bookings | `GET /bookings/my-bookings` | ✅ |
+| Meus bookings | `GET /bookings` | ✅ |
 | Criar checkout | `POST /payments/create-checkout-session` | ✅ |
 | Buscar planos | `GET /plans` | ✅ |
 | Minhas conversas | `GET /chat/conversations` | ✅ |
@@ -268,4 +268,3 @@ Todas as páginas são responsivas e funcionam em:
 ---
 
 **Desenvolvido em:** Janeiro 2026
-

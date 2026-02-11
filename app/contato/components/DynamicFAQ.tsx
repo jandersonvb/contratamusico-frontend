@@ -10,13 +10,14 @@ import { AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface FAQItem {
-  id: string;
+  id: string | number;
   question: string;
   answer: string;
   category: string | null;
 }
 
 export function DynamicFAQ() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -24,7 +25,7 @@ export function DynamicFAQ() {
   useEffect(() => {
     async function fetchFAQs() {
       try {
-        const response = await fetch("/api/faq");
+        const response = await fetch(`${API_URL}/faq`);
         if (!response.ok) throw new Error("Failed to fetch");
         const data = await response.json();
         setFaqs(data);
@@ -98,7 +99,7 @@ export function DynamicFAQ() {
   return (
     <Accordion type="single" collapsible className="space-y-2">
       {faqs.map((faq) => (
-        <AccordionItem key={faq.id} value={faq.id}>
+        <AccordionItem key={faq.id} value={String(faq.id)}>
           <AccordionTrigger className="flex items-center justify-between p-3 rounded-md bg-card hover:bg-muted text-left">
             <span>{faq.question}</span>
           </AccordionTrigger>
@@ -110,4 +111,3 @@ export function DynamicFAQ() {
     </Accordion>
   );
 }
-
