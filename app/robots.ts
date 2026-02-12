@@ -9,16 +9,17 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: [
         '/api/',
-        '/dashboard/',
-        '/perfil/',
+        '/dashboard',
+        '/perfil',
+        '/perfil/pagamentos',
         '/mensagens',
         '/favoritos',
         '/login',
         '/cadastro',
         '/esqueci-senha',
-        '/pagamento/',
+        '/pagamento/sucesso',
       ],
     },
-    sitemap: `${siteUrl}/sitemap.xml`,
+    sitemap: `${siteUrl}/sitemap-index.xml`,
   }
 }

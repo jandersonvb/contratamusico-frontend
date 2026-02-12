@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { fetchUserDataFromApi, loginRequest } from '@/api/auth';
 import { updateUserApi } from '@/api/user';
+import { sendStoredUtmAfterAuth } from '@/lib/utm';
 import { LoginCredentials, User, UserState, UpdateUserData } from '../types/user';
 
 export const useUserStore = create<UserState>()(
@@ -29,6 +30,14 @@ export const useUserStore = create<UserState>()(
               isLoggedIn: true, 
               isLoading: false 
             }, false, 'user/loginSuccess');
+
+            try {
+              await sendStoredUtmAfterAuth(data.access_token);
+            } catch (utmError) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('Falha ao enviar UTM no login:', utmError);
+              }
+            }
 
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Erro ao realizar login';

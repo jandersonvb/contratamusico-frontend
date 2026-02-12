@@ -1,18 +1,15 @@
-# *
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /dashboard/
-Disallow: /perfil/
+Disallow: /dashboard
+Disallow: /perfil
+Disallow: /perfil/pagamentos
 Disallow: /mensagens
 Disallow: /favoritos
 Disallow: /login
 Disallow: /cadastro
 Disallow: /esqueci-senha
-Disallow: /pagamento/
+Disallow: /pagamento/sucesso
 
-# Host
 Host: https://contratamusico.com.br
-
-# Sitemaps
-Sitemap: https://contratamusico.com.br/sitemap.xml
+Sitemap: https://contratamusico.com.br/sitemap-index.xml
