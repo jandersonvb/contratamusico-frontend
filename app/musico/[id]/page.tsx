@@ -63,10 +63,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       alternates: {
         canonical: musicianUrl,
       },
+      robots: {
+        index: true,
+        follow: true,
+      },
     };
   } catch {
     return {
       title: "Músico não encontrado",
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 }

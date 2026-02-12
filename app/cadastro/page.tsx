@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { registerUser } from "@/api/auth";
 import { UserType } from "@/lib/types/user";
 import { useUserStore } from "@/lib/stores/userStore";
+import { sendStoredUtmAfterAuth } from "@/lib/utm";
 
 
 export default function CadastroPage() {
@@ -178,6 +179,14 @@ export default function CadastroPage() {
       // Salvar token e usuário
       localStorage.setItem('token', response.access_token);
       setUser(response.user);
+
+      try {
+        await sendStoredUtmAfterAuth(response.access_token);
+      } catch (utmError) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("Falha ao enviar UTM no cadastro:", utmError);
+        }
+      }
 
       toast.success("Conta criada com sucesso! Bem-vindo(a) à plataforma.");
       

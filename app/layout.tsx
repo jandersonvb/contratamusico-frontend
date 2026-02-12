@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Suspense } from "react";
 import { ConditionalFooter } from "./components/Footer/ConditionalFooter";
 import { Navbar } from "./components/Navbar/Navbar";
 import { ChatProvider } from "./components/ChatProvider";
 import { FloatingChat } from "./components/FloatingChat";
-import GoogleAnalytics from "./components/GoogleAnalytics";
 import { OrganizationSchema } from "./components/StructuredData/OrganizationSchema";
 import { WebsiteSchema } from "./components/StructuredData/WebsiteSchema";
+import GoogleTagManager from "./components/analytics/GoogleTagManager";
+import MicrosoftClarity from "./components/analytics/MicrosoftClarity";
+import AnalyticsEnvCheck from "./components/analytics/AnalyticsEnvCheck";
+import { UtmTracker } from "./components/analytics/UtmTracker";
 
 import { Toaster } from "sonner";
 
 
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://contratamusico.com.br";
+const gtmId = process.env.NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID;
+const clarityProjectId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -49,6 +55,17 @@ export const metadata: Metadata = {
     title: "Contrata Músico",
   },
   applicationName: "Contrata Músico",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    other: [
+      { rel: "mask-icon", url: "/images/logo.svg", color: "#000000" },
+    ],
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -87,11 +104,13 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: siteUrl,
+    canonical: "./",
   },
   verification: {
-    google: "78iEsEjnf1W9mQAAp_AehgJj_qghDXctMF23nObHhqM",
-    // Adicione após verificar no Google Search Console
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "78iEsEjnf1W9mQAAp_AehgJj_qghDXctMF23nObHhqM",
+    other: {
+      "facebook-domain-verification": process.env.NEXT_PUBLIC_FACEBOOK_DOMAIN_VERIFICATION || "",
+    },
   },
 };
 
@@ -103,6 +122,16 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
+        {gtmId && (
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+              height="0"
+              width="0"
+              style={{ display: "none", visibility: "hidden" }}
+            />
+          </noscript>
+        )}
         {/* PWA Meta Tags */}
         <meta name="theme-color" content="#000000" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -118,16 +147,18 @@ export default function RootLayout({
       <body className="antialiased overflow-x-hidden max-w-screen">
         <ChatProvider>
           <Navbar />
+          <Suspense fallback={null}>
+            <UtmTracker />
+          </Suspense>
           {children}
           <ConditionalFooter />
           <FloatingChat />
         </ChatProvider>
         <Toaster richColors position="bottom-right" />
-        
-        {/* Google Analytics */}
-        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
-        )}
+
+        {gtmId && <GoogleTagManager gtmId={gtmId} />}
+        {clarityProjectId && <MicrosoftClarity projectId={clarityProjectId} />}
+        <AnalyticsEnvCheck />
       </body>
     </html>
   );
