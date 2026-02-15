@@ -18,9 +18,11 @@ import {
   CreditCard,
   User,
   Heart,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserRole } from "@/lib/types/user";
 
 // Componente para mostrar Avatar e info do usuário no menu mobile
 function MobileUserHeader() {
@@ -66,7 +68,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const pathname = usePathname();
-  const { isLoggedIn } = useUserStore();
+  const { isLoggedIn, user } = useUserStore();
   const { unreadCount } = useChatStore();
 
   // Garante que o componente só renderize após a hidratação do Zustand
@@ -157,6 +159,12 @@ export function Navbar() {
             <CreditCard className="h-4 w-4" />
             Planos
           </Link>
+          {hydrated && isLoggedIn && user?.role === UserRole.ADMIN && (
+            <Link href="/admin" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+              <Shield className="h-4 w-4" />
+              Admin
+            </Link>
+          )}
 
           {/* À direita: auth vs avatar */}
           <div className="ml-2">
@@ -295,6 +303,12 @@ export function Navbar() {
                   <CreditCard className="h-4 w-4" />
                   Planos
                 </Link>
+                {hydrated && isLoggedIn && user?.role === UserRole.ADMIN && (
+                  <Link href="/admin" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                    <Shield className="h-4 w-4" />
+                    Admin
+                  </Link>
+                )}
 
                 {hydrated && isLoggedIn ? (
                   <>

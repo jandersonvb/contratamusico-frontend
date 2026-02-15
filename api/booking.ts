@@ -1,5 +1,12 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+export interface BookingParty {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
 export interface Booking {
   id: number;
   musicianProfileId: number;
@@ -8,6 +15,8 @@ export interface Booking {
   eventType: string;
   message: string;
   status: string;
+  musician?: BookingParty;
+  client?: BookingParty | null;
   musicianName?: string;
   clientName?: string;
   createdAt: string;
@@ -19,6 +28,40 @@ export interface CreateBookingData {
   eventDate: string;
   eventType: string;
   message: string;
+}
+
+interface RawBooking {
+  id: number;
+  musicianProfileId?: number;
+  clientId?: number | null;
+  eventDate: string;
+  eventType: string;
+  message: string;
+  status: string;
+  musician?: BookingParty;
+  client?: BookingParty | null;
+  musicianName?: string;
+  clientName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normalizeBooking(raw: RawBooking): Booking {
+  return {
+    id: raw.id,
+    musicianProfileId: raw.musicianProfileId ?? raw.musician?.id ?? 0,
+    clientId: raw.clientId ?? raw.client?.id ?? null,
+    eventDate: raw.eventDate,
+    eventType: raw.eventType,
+    message: raw.message,
+    status: raw.status,
+    musician: raw.musician,
+    client: raw.client ?? null,
+    musicianName: raw.musicianName ?? raw.musician?.name,
+    clientName: raw.clientName ?? raw.client?.name,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
 }
 
 /**
@@ -45,7 +88,8 @@ export async function createBooking(data: CreateBookingData): Promise<Booking> {
     throw new Error(errorData?.message || 'Erro ao criar solicitação de contratação');
   }
 
-  return response.json();
+  const result = await response.json();
+  return normalizeBooking(result);
 }
 
 /**
@@ -96,7 +140,7 @@ export async function getMyBookings(): Promise<Booking[]> {
     }
 
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? data.map(normalizeBooking) : [];
   } catch (error) {
     // Log do erro apenas em desenvolvimento
     if (process.env.NODE_ENV === 'development') {
@@ -134,5 +178,33 @@ export async function updateBookingStatus(
     throw new Error(errorData?.message || 'Erro ao atualizar status da contratação');
   }
 
-  return response.json();
+  const result = await response.json();
+  return normalizeBooking(result);
+}
+
+/**
+ * Busca detalhes de um booking específico
+ */
+export async function getBookingById(bookingId: number): Promise<Booking> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Token não encontrado');
+  }
+
+  const response = await fetch(`${API_URL}/bookings/${bookingId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao buscar contratação');
+  }
+
+  const result = await response.json();
+  return normalizeBooking(result);
 }

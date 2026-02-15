@@ -11,4 +11,9 @@ export * from './plan';
 export * from './chat';
 export * from './favorite';
 export * from './portfolio';
+export * from './review';
+export * from './admin';
+export * from './upload';
+export * from './faq';
+export * from './contact';
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,15 @@ import { useFavoriteStore } from "@/lib/stores/favoriteStore";
 import { useSocket } from "@/hooks/useSocket";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { MusicianSchema } from "@/app/components/StructuredData/MusicianSchema";
+import {
+  createReview,
+  getMusicianReviews,
+  getMusicianReviewStats,
+  ReviewApiError,
+  type ReviewItem,
+  type ReviewStatsResponse,
+} from "@/api/review";
+import { UserType } from "@/lib/types/user";
 
 interface MusicianDetailClientProps {
   musician: MusicianProfile;
@@ -54,14 +63,48 @@ function getStarArray(rating: number) {
 
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
   const router = useRouter();
-  const { isLoggedIn } = useUserStore();
+  const { isLoggedIn, user, fetchUser } = useUserStore();
   const { emit, isConnected } = useSocket();
-  const { openFloatingChat, conversations } = useChatStore();
+  const { openFloatingChat, conversations, onlineUsers } = useChatStore();
 
   const [activeTab, setActiveTab] = useState<TabType>("sobre");
   const [form, setForm] = useState({ date: "", eventType: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsTotalPages, setReviewsTotalPages] = useState(1);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [reviewStats, setReviewStats] = useState<ReviewStatsResponse | null>(null);
+  const [reviewStatsError, setReviewStatsError] = useState<string | null>(null);
+  const [reviewForm, setReviewForm] = useState({
+    rating: "5",
+    event: "",
+    content: "",
+  });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const canCreateReview = isLoggedIn && user?.userType === UserType.CLIENT;
+  const isMusicianOnline = isConnected && onlineUsers.has(musician.userId);
+
+  const fallbackReviews = useMemo<ReviewItem[]>(
+    () =>
+      (musician.reviews ?? []).map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        content: review.content,
+        event: review.event,
+        clientName: review.clientName,
+        date: review.date,
+        createdAt: review.date,
+      })),
+    [musician.reviews]
+  );
+
+  const displayReviews = reviews.length > 0 ? reviews : fallbackReviews;
+  const previewReviews = displayReviews.slice(0, 2);
+  const ratingSummary = reviewStats?.averageRating ?? musician.rating;
+  const totalReviewsSummary = reviewStats?.totalReviews ?? musician.ratingCount;
 
   // Favoritos via store centralizada
   const favorite = useFavoriteStore((s) => s.favoriteIds.has(musician.id));
@@ -69,6 +112,120 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  useEffect(() => {
+    if (isLoggedIn && !user) {
+      fetchUser();
+    }
+  }, [isLoggedIn, user, fetchUser]);
+
+  const fetchReviewsData = useCallback(async (page = reviewsPage) => {
+    setIsLoadingReviews(true);
+    try {
+      const response = await getMusicianReviews(musician.id, page, 10);
+      setReviews(response.data);
+      setReviewsTotalPages(response.pagination.totalPages || 1);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar avaliações";
+      toast.error(message);
+      setReviews([]);
+      setReviewsTotalPages(1);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  }, [musician.id, reviewsPage]);
+
+  const fetchReviewStatsData = useCallback(async () => {
+    setReviewStatsError(null);
+    try {
+      const response = await getMusicianReviewStats(musician.id);
+      setReviewStats(response);
+    } catch (error) {
+      setReviewStats(null);
+      if (error instanceof ReviewApiError && error.status === 403) {
+        setReviewStatsError("Este músico não possui acesso às estatísticas detalhadas no plano atual.");
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar estatísticas de avaliação";
+      setReviewStatsError(message);
+    }
+  }, [musician.id]);
+
+  useEffect(() => {
+    fetchReviewsData(reviewsPage);
+  }, [reviewsPage, fetchReviewsData]);
+
+  useEffect(() => {
+    fetchReviewStatsData();
+  }, [fetchReviewStatsData]);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!isLoggedIn) {
+      toast.error("Faça login para enviar uma avaliação.");
+      router.push("/login");
+      return;
+    }
+
+    if (!canCreateReview) {
+      toast.error("Apenas clientes podem enviar avaliações.");
+      return;
+    }
+
+    if (!reviewForm.event.trim() || !reviewForm.content.trim()) {
+      toast.error("Preencha o evento e o comentário da avaliação.");
+      return;
+    }
+
+    const rating = Number(reviewForm.rating);
+    if (Number.isNaN(rating) || rating < 1 || rating > 5) {
+      toast.error("Selecione uma nota válida entre 1 e 5.");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      await createReview(musician.id, {
+        rating,
+        event: reviewForm.event.trim(),
+        content: reviewForm.content.trim(),
+      });
+
+      toast.success("Avaliação enviada com sucesso.");
+      setReviewForm({
+        rating: "5",
+        event: "",
+        content: "",
+      });
+      setReviewsPage(1);
+      await Promise.all([fetchReviewsData(1), fetchReviewStatsData()]);
+    } catch (error) {
+      if (error instanceof ReviewApiError) {
+        if (error.status === 401) {
+          toast.error("Sua sessão expirou. Faça login novamente.");
+          router.push("/login");
+          return;
+        }
+        if (error.status === 403) {
+          toast.error("Você não tem permissão para avaliar este músico.");
+          return;
+        }
+        if (error.status === 400) {
+          toast.error(error.message);
+          return;
+        }
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Erro ao enviar avaliação";
+      toast.error(message);
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   const handleSubmitContact = async (e: React.FormEvent) => {
@@ -272,7 +429,13 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                   />
                 </div>
                 {/* Online indicator */}
-                <span className="absolute bottom-1 right-1 block h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-green-500 ring-3 ring-card" />
+                {isMusicianOnline && (
+                  <span
+                    className="absolute bottom-1 right-1 block h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-green-500 ring-3 ring-card"
+                    aria-label="Músico online"
+                    title="Músico online"
+                  />
+                )}
               </div>
 
               {/* Info */}
@@ -533,7 +696,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         <Star className="h-5 w-5 text-primary" />
                         Avaliações dos Clientes
                       </h2>
-                      {musician.reviews && musician.reviews.length > 2 && (
+                      {totalReviewsSummary > 2 && (
                         <button
                           onClick={() => setActiveTab("avaliacoes")}
                           className="text-sm text-primary hover:underline"
@@ -545,11 +708,11 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
 
                     <div className="flex items-center gap-4 mb-5">
                       <span className="text-4xl font-bold text-primary">
-                        {musician.rating.toFixed(1)}
+                        {ratingSummary.toFixed(1)}
                       </span>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-0.5">
-                          {getStarArray(musician.rating).map((filled, idx) => (
+                          {getStarArray(ratingSummary).map((filled, idx) => (
                             <Star
                               key={idx}
                               className={`h-4 w-4 ${
@@ -562,14 +725,14 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                           ))}
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {musician.ratingCount} avaliações
+                          {totalReviewsSummary} avaliações
                         </span>
                       </div>
                     </div>
 
-                    {musician.reviews && musician.reviews.length > 0 ? (
+                    {previewReviews.length > 0 ? (
                       <div className="space-y-4">
-                        {musician.reviews.slice(0, 2).map((review) => (
+                        {previewReviews.map((review) => (
                           <div
                             key={review.id}
                             className="border rounded-lg p-4 space-y-2"
@@ -584,7 +747,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                                     {review.clientName}
                                   </span>
                                   <span className="text-xs text-muted-foreground">
-                                    {review.date}
+                                    {review.date || new Date(review.createdAt).toLocaleDateString("pt-BR")}
                                   </span>
                                 </div>
                               </div>
@@ -807,13 +970,13 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
 
                 {/* Rating summary */}
                 <div className="bg-card border rounded-lg p-6 mb-6">
-                  <div className="flex items-center gap-6">
+                  <div className="flex flex-wrap items-center gap-6">
                     <div className="text-center">
                       <span className="text-5xl font-bold text-primary block">
-                        {musician.rating.toFixed(1)}
+                        {ratingSummary.toFixed(1)}
                       </span>
                       <div className="flex items-center gap-0.5 mt-1 justify-center">
-                        {getStarArray(musician.rating).map((filled, idx) => (
+                        {getStarArray(ratingSummary).map((filled, idx) => (
                           <Star
                             key={idx}
                             className={`h-4 w-4 ${
@@ -826,64 +989,204 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         ))}
                       </div>
                       <span className="text-sm text-muted-foreground mt-1 block">
-                        {musician.ratingCount} avaliações
+                        {totalReviewsSummary} avaliações
                       </span>
                     </div>
+                    {reviewStats?.ratingDistribution && (
+                      <div className="flex-1 min-w-[250px] space-y-2">
+                        {[5, 4, 3, 2, 1].map((value) => {
+                          const key = String(value) as "1" | "2" | "3" | "4" | "5";
+                          const total = Math.max(reviewStats.totalReviews, 1);
+                          const count = reviewStats.ratingDistribution?.[key] ?? 0;
+                          const percentage = (count / total) * 100;
+                          return (
+                            <div key={value} className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="w-6">{value}★</span>
+                              <div className="h-2 flex-1 rounded bg-muted overflow-hidden">
+                                <div className="h-full bg-primary" style={{ width: `${percentage}%` }} />
+                              </div>
+                              <span className="w-8 text-right">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
+                  {reviewStatsError && (
+                    <p className="mt-4 text-sm text-muted-foreground">{reviewStatsError}</p>
+                  )}
                 </div>
 
-                {musician.reviews && musician.reviews.length > 0 ? (
-                  <div className="space-y-4">
-                    {musician.reviews.map((review) => (
-                      <div
-                        key={review.id}
-                        className="bg-card border rounded-lg p-5 space-y-3"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                              {review.clientName.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <span className="font-medium text-sm block">
-                                {review.clientName}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {review.date}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex gap-0.5">
-                            {getStarArray(review.rating).map((filled, idx) => (
-                              <Star
-                                key={idx}
-                                className={`h-4 w-4 ${
-                                  filled
-                                    ? "text-yellow-400"
-                                    : "text-muted-foreground/30"
-                                }`}
-                                fill={filled ? "currentColor" : "none"}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {review.content}
+                <div className="space-y-6">
+                  <div className="bg-card border rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">Deixe sua avaliação</h3>
+                    {!isLoggedIn ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Faça login como cliente para avaliar este músico.
                         </p>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
-                          <Calendar className="h-3 w-3" /> {review.event}
-                        </div>
+                        <Button onClick={() => router.push("/login")}>
+                          Entrar para avaliar
+                        </Button>
                       </div>
-                    ))}
+                    ) : canCreateReview ? (
+                      <form onSubmit={handleSubmitReview} className="space-y-4">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label htmlFor="review-rating" className="text-sm font-medium">
+                              Nota
+                            </label>
+                            <Select
+                              value={reviewForm.rating}
+                              onValueChange={(value) =>
+                                setReviewForm((prev) => ({ ...prev, rating: value }))
+                              }
+                            >
+                              <SelectTrigger id="review-rating" className="w-full">
+                                {reviewForm.rating} estrela(s)
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="5">5 estrelas</SelectItem>
+                                <SelectItem value="4">4 estrelas</SelectItem>
+                                <SelectItem value="3">3 estrelas</SelectItem>
+                                <SelectItem value="2">2 estrelas</SelectItem>
+                                <SelectItem value="1">1 estrela</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <label htmlFor="review-event" className="text-sm font-medium">
+                              Evento
+                            </label>
+                            <Input
+                              id="review-event"
+                              value={reviewForm.event}
+                              onChange={(e) =>
+                                setReviewForm((prev) => ({ ...prev, event: e.target.value }))
+                              }
+                              placeholder="Ex: Casamento, aniversário, festa corporativa"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label htmlFor="review-content" className="text-sm font-medium">
+                            Comentário
+                          </label>
+                          <Textarea
+                            id="review-content"
+                            value={reviewForm.content}
+                            onChange={(e) =>
+                              setReviewForm((prev) => ({ ...prev, content: e.target.value }))
+                            }
+                            placeholder="Conte como foi sua experiência..."
+                            rows={4}
+                            required
+                          />
+                        </div>
+                        <Button type="submit" disabled={isSubmittingReview}>
+                          {isSubmittingReview ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            "Enviar avaliação"
+                          )}
+                        </Button>
+                      </form>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Apenas usuários contratantes podem enviar avaliações.
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <div className="bg-card border rounded-lg p-12 text-center">
-                    <Star className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                    <p className="text-muted-foreground">
-                      Nenhuma avaliação ainda.
-                    </p>
-                  </div>
-                )}
+
+                  {isLoadingReviews ? (
+                    <div className="bg-card border rounded-lg p-12 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : displayReviews.length > 0 ? (
+                    <div className="space-y-4">
+                      {displayReviews.map((review) => (
+                        <div
+                          key={review.id}
+                          className="bg-card border rounded-lg p-5 space-y-3"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                                {review.clientName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="font-medium text-sm block">
+                                  {review.clientName}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {review.date || new Date(review.createdAt).toLocaleDateString("pt-BR")}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex gap-0.5">
+                              {getStarArray(review.rating).map((filled, idx) => (
+                                <Star
+                                  key={idx}
+                                  className={`h-4 w-4 ${
+                                    filled
+                                      ? "text-yellow-400"
+                                      : "text-muted-foreground/30"
+                                  }`}
+                                  fill={filled ? "currentColor" : "none"}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {review.content}
+                          </p>
+                          {review.event && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+                              <Calendar className="h-3 w-3" /> {review.event}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-card border rounded-lg p-12 text-center">
+                      <Star className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                      <p className="text-muted-foreground">
+                        Nenhuma avaliação ainda.
+                      </p>
+                    </div>
+                  )}
+
+                  {reviewsTotalPages > 1 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Página {reviewsPage} de {reviewsTotalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReviewsPage((prev) => Math.max(1, prev - 1))}
+                          disabled={reviewsPage <= 1 || isLoadingReviews}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReviewsPage((prev) => prev + 1)}
+                          disabled={reviewsPage >= reviewsTotalPages || isLoadingReviews}
+                        >
+                          Próxima
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

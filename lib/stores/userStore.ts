@@ -23,9 +23,17 @@ export const useUserStore = create<UserState>()(
             // Salva o token
             localStorage.setItem('token', data.access_token);
 
-            // O backend já retorna o usuário no login, então já setamos aqui
+            // Busca o usuário completo após login para garantir campos
+            // derivados (ex.: profileImageUrl assinada) já no primeiro render.
+            let userData = data.user;
+            try {
+              userData = await fetchUserDataFromApi();
+            } catch {
+              // Fallback para payload do login se /users/me falhar momentaneamente.
+            }
+
             set({ 
-              user: data.user, 
+              user: userData, 
               isLoggedIn: true, 
               isLoading: false 
             }, false, 'user/loginSuccess');

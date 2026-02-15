@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
@@ -22,9 +22,23 @@ import { useUserStore } from "@/lib/stores/userStore";
 import { UserType } from "@/lib/types/user";
 import { getMySubscription, cancelSubscription, reactivateSubscription, createPortalSession } from "@/api/payment";
 import type { SubscriptionResponse } from "@/api/payment";
+import {
+  updateMyMusicianGenres,
+  updateMyMusicianInstruments,
+  updateMyMusicianProfile,
+} from "@/api/musician";
+import {
+  getMusicianReviews,
+  getMusicianReviewStats,
+  ReviewApiError,
+  type ReviewItem,
+  type ReviewStatsResponse,
+} from "@/api/review";
 import { uploadAvatar } from "@/api/user";
 import { uploadPortfolioFile, getMyPortfolio, deletePortfolioItem } from "@/api/portfolio";
 import type { PortfolioItem } from "@/lib/types/portfolio";
+import { useGenreStore } from "@/lib/stores/genreStore";
+import { useInstrumentStore } from "@/lib/stores/instrumentStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +51,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+type ProfileTab =
+  | "info-pessoais"
+  | "info-musicais"
+  | "portfolio"
+  | "avaliacoes"
+  | "assinatura"
+  | "configuracoes";
+
+const PROFILE_TABS: ProfileTab[] = [
+  "info-pessoais",
+  "info-musicais",
+  "portfolio",
+  "avaliacoes",
+  "assinatura",
+  "configuracoes",
+];
+
 /**
  * Profile page that allows the logged in musician to view and edit their
  * personal and musical information. It also shows a summary card with
@@ -47,6 +78,8 @@ import {
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
+  const { genres, fetchGenres } = useGenreStore();
+  const { instruments, fetchInstruments } = useInstrumentStore();
 
   // Verificar autenticação
   useEffect(() => {
@@ -67,14 +100,7 @@ export default function PerfilPage() {
   const isMusician = user?.userType === UserType.MUSICIAN;
 
   // Tabs state
-  const [activeTab, setActiveTab] = useState<
-    | "info-pessoais"
-    | "info-musicais"
-    | "portfolio"
-    | "avaliacoes"
-    | "assinatura"
-    | "configuracoes"
-  >("info-pessoais");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("info-pessoais");
 
   // Subscription state
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionResponse | null>(null);
@@ -128,16 +154,23 @@ export default function PerfilPage() {
     phone: "",
     city: "",
     state: "",
-    bio: "",
   });
 
   const [musicalForm, setMusicalForm] = useState({
     instruments: [] as string[],
     genres: [] as string[],
+    bio: "",
     experience: "",
     priceRange: "",
     equipment: "",
   });
+
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsTotalPages, setReviewsTotalPages] = useState(1);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [reviewStats, setReviewStats] = useState<ReviewStatsResponse | null>(null);
+  const [reviewStatsError, setReviewStatsError] = useState<string | null>(null);
 
   // Atualizar formulários quando os dados do usuário carregarem
   useEffect(() => {
@@ -149,13 +182,13 @@ export default function PerfilPage() {
         phone: user.phone || "",
         city: user.city || "",
         state: user.state || "",
-        bio: musicianProfile?.bio || "",
       });
 
       if (musicianProfile) {
         setMusicalForm({
-          instruments: musicianProfile.instruments?.map((i) => i.name) || [],
-          genres: musicianProfile.genres?.map((g) => g.name) || [],
+          instruments: musicianProfile.instruments?.map((i) => i.slug) || [],
+          genres: musicianProfile.genres?.map((g) => g.slug) || [],
+          bio: musicianProfile.bio || "",
           experience: musicianProfile.experience || "",
           priceRange: musicianProfile.priceFrom ? getPriceRangeFromValue(musicianProfile.priceFrom) : "",
           equipment: musicianProfile.equipment || "",
@@ -163,6 +196,25 @@ export default function PerfilPage() {
       }
     }
   }, [user, musicianProfile]);
+
+  useEffect(() => {
+    if (!isMusician) return;
+    fetchGenres();
+    fetchInstruments();
+  }, [isMusician, fetchGenres, fetchInstruments]);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam && PROFILE_TABS.includes(tabParam as ProfileTab)) {
+        setActiveTab(tabParam as ProfileTab);
+      }
+    };
+
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
 
   const fetchSubscriptionData = useCallback(async () => {
     setIsLoadingSubscription(true);
@@ -193,6 +245,54 @@ export default function PerfilPage() {
       }
     }
   }, [activeTab, isLoggedIn, isMusician, subscriptionData, fetchSubscriptionData]);
+
+  const fetchReviews = useCallback(async () => {
+    if (!musicianProfile?.id) return;
+
+    setIsLoadingReviews(true);
+    try {
+      const data = await getMusicianReviews(musicianProfile.id, reviewsPage, 10);
+      setReviews(data.data);
+      setReviewsTotalPages(data.pagination.totalPages || 1);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao carregar avaliações";
+      toast.error(message);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  }, [musicianProfile?.id, reviewsPage]);
+
+  const fetchReviewStats = useCallback(async () => {
+    if (!musicianProfile?.id) return;
+
+    setReviewStatsError(null);
+    try {
+      const data = await getMusicianReviewStats(musicianProfile.id);
+      setReviewStats(data);
+    } catch (error) {
+      setReviewStats(null);
+      if (error instanceof ReviewApiError && error.status === 403) {
+        setReviewStatsError("Seu plano atual não inclui estatísticas detalhadas.");
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : "Erro ao carregar estatísticas";
+      setReviewStatsError(message);
+      toast.error(message);
+    }
+  }, [musicianProfile?.id]);
+
+  useEffect(() => {
+    if (activeTab === "avaliacoes" && isLoggedIn && isMusician) {
+      fetchReviews();
+    }
+  }, [activeTab, isLoggedIn, isMusician, fetchReviews]);
+
+  useEffect(() => {
+    if (activeTab === "avaliacoes" && isLoggedIn && isMusician) {
+      fetchReviewStats();
+    }
+  }, [activeTab, isLoggedIn, isMusician, fetchReviewStats]);
 
   const fetchPortfolio = async () => {
     setIsLoadingPortfolio(true);
@@ -255,16 +355,50 @@ export default function PerfilPage() {
     return "0-300";
   };
 
+  const getPriceFromRange = (priceRange: string): number | undefined => {
+    if (!priceRange) return undefined;
+    const match = priceRange.match(/\d+/);
+    if (!match) return undefined;
+    return Number(match[0]);
+  };
+
   // Options for selects and checkboxes
-  const instrumentOptions = [
-    "Violão",
-    "Guitarra",
-    "Vocal",
-    "Piano",
-    "Bateria",
-    "Sax",
-  ];
-  const genreOptions = ["MPB", "Bossa Nova", "Pop", "Rock", "Jazz", "Samba"];
+  const instrumentOptions = useMemo(() => {
+    if (instruments.length > 0) {
+      return instruments.map((item) => ({
+        value: item.slug,
+        label: item.name,
+      }));
+    }
+
+    return [
+      { value: "violao", label: "Violão" },
+      { value: "guitarra", label: "Guitarra" },
+      { value: "vocal", label: "Vocal" },
+      { value: "piano", label: "Piano" },
+      { value: "bateria", label: "Bateria" },
+      { value: "saxofone", label: "Saxofone" },
+    ];
+  }, [instruments]);
+
+  const genreOptions = useMemo(() => {
+    if (genres.length > 0) {
+      return genres.map((item) => ({
+        value: item.slug,
+        label: item.name,
+      }));
+    }
+
+    return [
+      { value: "mpb", label: "MPB" },
+      { value: "bossa-nova", label: "Bossa Nova" },
+      { value: "pop", label: "Pop" },
+      { value: "rock", label: "Rock" },
+      { value: "jazz", label: "Jazz" },
+      { value: "samba", label: "Samba" },
+    ];
+  }, [genres]);
+
   const experienceOptions = [
     { value: "iniciante", label: "Iniciante (0-2 anos)" },
     { value: "intermediario", label: "Intermediário (2-5 anos)" },
@@ -307,7 +441,13 @@ export default function PerfilPage() {
   const savePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateUser({ ...personalForm });
+      await updateUser({
+        firstName: personalForm.firstName,
+        lastName: personalForm.lastName,
+        phone: personalForm.phone,
+        city: personalForm.city,
+        state: personalForm.state,
+      });
       toast.success("Informações pessoais atualizadas!");
       setEditPersonal(false);
     } catch (error) {
@@ -316,10 +456,33 @@ export default function PerfilPage() {
     }
   };
 
-  const saveMusicalInfo = (e: React.FormEvent) => {
+  const saveMusicalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Informações musicais atualizadas!");
-    setEditMusical(false);
+    try {
+      await updateMyMusicianProfile({
+        bio: musicalForm.bio || undefined,
+        experience: musicalForm.experience || undefined,
+        equipment: musicalForm.equipment || undefined,
+        priceFrom: getPriceFromRange(musicalForm.priceRange),
+      });
+
+      await Promise.all([
+        updateMyMusicianGenres(musicalForm.genres),
+        updateMyMusicianInstruments(musicalForm.instruments),
+      ]);
+
+      await fetchUser();
+      toast.success("Informações musicais atualizadas!");
+      setEditMusical(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar informações musicais";
+      toast.error(message);
+    }
+  };
+
+  const handleTabChange = (tab: ProfileTab) => {
+    setActiveTab(tab);
+    router.replace(`/perfil?tab=${tab}`, { scroll: false });
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -562,8 +725,7 @@ export default function PerfilPage() {
               ].map((item) => (
                 <button
                   key={item.id}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onClick={() => setActiveTab(item.id as any)}
+                  onClick={() => handleTabChange(item.id as ProfileTab)}
                   className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${activeTab === item.id
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted"
@@ -613,7 +775,6 @@ export default function PerfilPage() {
                             phone: user.phone || "",
                             city: user.city || "",
                             state: user.state || "",
-                            bio: musicianProfile?.bio || "",
                           });
                         }}
                       >
@@ -713,20 +874,6 @@ export default function PerfilPage() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label htmlFor="bio" className="text-sm font-medium">
-                      Biografia
-                    </label>
-                    <Textarea
-                      id="bio"
-                      value={personalForm.bio}
-                      onChange={(e) =>
-                        handlePersonalChange("bio", e.target.value)
-                      }
-                      readOnly={!editPersonal}
-                      rows={5}
-                    />
-                  </div>
                 </form>
               </div>
             )}
@@ -753,8 +900,9 @@ export default function PerfilPage() {
                           setEditMusical(false);
                           if (musicianProfile) {
                             setMusicalForm({
-                              instruments: musicianProfile.instruments?.map((i) => i.name) || [],
-                              genres: musicianProfile.genres?.map((g) => g.name) || [],
+                              instruments: musicianProfile.instruments?.map((i) => i.slug) || [],
+                              genres: musicianProfile.genres?.map((g) => g.slug) || [],
+                              bio: musicianProfile.bio || "",
                               experience: musicianProfile.experience || "",
                               priceRange: musicianProfile.priceFrom ? getPriceRangeFromValue(musicianProfile.priceFrom) : "",
                               equipment: musicianProfile.equipment || "",
@@ -773,10 +921,10 @@ export default function PerfilPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {instrumentOptions.map((option) => {
                         const checked =
-                          musicalForm.instruments.includes(option);
+                          musicalForm.instruments.includes(option.value);
                         return (
                           <label
-                            key={option}
+                            key={option.value}
                             className="flex items-center gap-2 text-sm cursor-pointer"
                           >
                             <Checkbox
@@ -784,13 +932,13 @@ export default function PerfilPage() {
                               onCheckedChange={(val) =>
                                 handleMusicalCheckbox(
                                   "instruments",
-                                  option,
+                                  option.value,
                                   !!val
                                 )
                               }
                               disabled={!editMusical}
                             />
-                            <span>{option}</span>
+                            <span>{option.label}</span>
                           </label>
                         );
                       })}
@@ -800,20 +948,20 @@ export default function PerfilPage() {
                     <p className="font-medium text-sm">Estilos Musicais</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {genreOptions.map((option) => {
-                        const checked = musicalForm.genres.includes(option);
+                        const checked = musicalForm.genres.includes(option.value);
                         return (
                           <label
-                            key={option}
+                            key={option.value}
                             className="flex items-center gap-2 text-sm cursor-pointer"
                           >
                             <Checkbox
                               checked={checked}
                               onCheckedChange={(val) =>
-                                handleMusicalCheckbox("genres", option, !!val)
+                                handleMusicalCheckbox("genres", option.value, !!val)
                               }
                               disabled={!editMusical}
                             />
-                            <span>{option}</span>
+                            <span>{option.label}</span>
                           </label>
                         );
                       })}
@@ -876,6 +1024,20 @@ export default function PerfilPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="bio" className="text-sm font-medium">
+                      Biografia
+                    </label>
+                    <Textarea
+                      id="bio"
+                      value={musicalForm.bio}
+                      onChange={(e) =>
+                        handleMusicalChange("bio", e.target.value)
+                      }
+                      readOnly={!editMusical}
+                      rows={4}
+                    />
                   </div>
                   <div className="space-y-1">
                     <label htmlFor="equipment" className="text-sm font-medium">
@@ -1159,11 +1321,154 @@ export default function PerfilPage() {
               </div>
             )}
             {activeTab === "avaliacoes" && (
-              <div className="bg-card border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2">Avaliações</h3>
-                <p className="text-sm text-muted-foreground">
-                  Em breve você poderá ver as avaliações que recebeu.
-                </p>
+              <div className="space-y-6">
+                {!isMusician ? (
+                  <div className="bg-card border rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-2">Avaliações</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Apenas perfis de músico possuem avaliações públicas.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-card border rounded-lg p-6 space-y-4">
+                      <h3 className="text-lg font-semibold">Resumo de Avaliações</h3>
+                      {reviewStats ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-6">
+                            <div>
+                              <p className="text-3xl font-bold text-primary">
+                                {reviewStats.averageRating.toFixed(1)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Média geral</p>
+                            </div>
+                            <div>
+                              <p className="text-3xl font-bold">
+                                {reviewStats.totalReviews}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Total de avaliações</p>
+                            </div>
+                          </div>
+                          {reviewStats.ratingDistribution && (
+                            <div className="space-y-2">
+                              {[5, 4, 3, 2, 1].map((value) => {
+                                const key = String(value) as '1' | '2' | '3' | '4' | '5';
+                                const total = Math.max(reviewStats.totalReviews, 1);
+                                const count = reviewStats.ratingDistribution?.[key] ?? 0;
+                                const width = `${(count / total) * 100}%`;
+                                return (
+                                  <div key={value} className="flex items-center gap-3">
+                                    <span className="w-6 text-xs text-muted-foreground">{value}★</span>
+                                    <div className="h-2 flex-1 rounded bg-muted overflow-hidden">
+                                      <div className="h-full bg-primary" style={{ width }} />
+                                    </div>
+                                    <span className="w-8 text-right text-xs text-muted-foreground">
+                                      {count}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      ) : reviewStatsError ? (
+                        <div className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+                          {reviewStatsError}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Carregando estatísticas...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-card border rounded-lg p-6 space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-lg font-semibold">Avaliações recebidas</h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            fetchReviews();
+                            fetchReviewStats();
+                          }}
+                          disabled={isLoadingReviews}
+                        >
+                          Atualizar
+                        </Button>
+                      </div>
+
+                      {isLoadingReviews ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Carregando avaliações...
+                        </div>
+                      ) : reviews.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Você ainda não recebeu avaliações.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {reviews.map((review) => (
+                            <div key={review.id} className="rounded-lg border p-4 space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-medium">{review.clientName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {review.date || new Date(review.createdAt).toLocaleDateString("pt-BR")}
+                                  </p>
+                                </div>
+                                <div className="flex gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${i < Math.round(review.rating) ? "text-yellow-400" : "text-muted-foreground/40"}`}
+                                      fill={i < Math.round(review.rating) ? "currentColor" : "none"}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{review.content}</p>
+                              {review.event && (
+                                <p className="text-xs text-muted-foreground">Evento: {review.event}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {reviewsTotalPages > 1 && (
+                        <div className="flex items-center justify-between pt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Página {reviewsPage} de {reviewsTotalPages}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={reviewsPage <= 1 || isLoadingReviews}
+                              onClick={() => setReviewsPage((prev) => Math.max(1, prev - 1))}
+                            >
+                              Anterior
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={reviewsPage >= reviewsTotalPages || isLoadingReviews}
+                              onClick={() => setReviewsPage((prev) => prev + 1)}
+                            >
+                              Próxima
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {/* Subscription Tab */}
