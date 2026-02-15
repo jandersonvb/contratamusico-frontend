@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { planFaq } from "@/lib/plans";
+import { clientPlans, planFaq, type Plan as LocalPlan } from "@/lib/plans";
 import { Check, X, Star as StarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { getPlans, createCheckoutSession } from "@/api";
@@ -20,6 +20,34 @@ import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useRouter } from "next/navigation";
 
+function mapLocalPlansToApiShape(
+  localPlans: LocalPlan[],
+  category: "musician" | "client",
+): Plan[] {
+  return localPlans.map((plan, planIndex) => ({
+    id: -(planIndex + 1),
+    title: plan.title,
+    description: plan.description,
+    monthlyPrice: Math.round(plan.monthly * 100),
+    yearlyPrice: Math.round(plan.yearly * 100),
+    badge: plan.badge ?? null,
+    features: plan.features.map((feature, featureIndex) => ({
+      id: featureIndex + 1,
+      planId: -(planIndex + 1),
+      text: feature.text,
+      available: feature.available,
+      highlight: Boolean(feature.highlight),
+    })),
+    maxPhotos: null,
+    maxVideos: null,
+    hasSpotlight: false,
+    hasWhatsapp: false,
+    hasStatistics: false,
+    isMusicianPlan: category === "musician",
+    isClientPlan: category === "client",
+    createdAt: "",
+  }));
+}
 
 export default function PlanosPage() {
   const router = useRouter();
@@ -34,10 +62,18 @@ export default function PlanosPage() {
     setIsLoading(true);
     try {
       const data = await getPlans(category);
-      setPlans(data);
+      if (category === "client" && data.length === 0) {
+        setPlans(mapLocalPlansToApiShape(clientPlans, "client"));
+      } else {
+        setPlans(data);
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
-      toast.error(message);
+      if (category === "client") {
+        setPlans(mapLocalPlansToApiShape(clientPlans, "client"));
+      } else {
+        const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
+        toast.error(message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -48,6 +84,12 @@ export default function PlanosPage() {
   }, [fetchPlans]);
 
   const handleSubscribe = async (plan: Plan) => {
+    if (plan.id < 0) {
+      toast.info("Checkout para contratantes em breve. Fale com vendas para ativar.");
+      router.push("/contato");
+      return;
+    }
+
     if (!isLoggedIn) {
       toast.error("Você precisa estar logado para assinar um plano");
       router.push("/login");
@@ -80,9 +122,10 @@ export default function PlanosPage() {
     <>
       <SEO
         title="Planos e Preços"
-        description="Confira nossos planos para músicos e clientes. Opções gratuitas e premium com recursos exclusivos. Planos mensais e anuais com desconto. Escolha o melhor para você."
+        description="Confira nossos planos para músicos e contratantes. Opções gratuitas e premium com recursos exclusivos. Planos mensais e anuais com desconto. Escolha o melhor para você."
         keywords={[
           "planos para músicos",
+          "planos para contratantes",
           "preços contrata músico",
           "assinatura músico",
           "plano premium",
@@ -97,7 +140,7 @@ export default function PlanosPage() {
             Escolha o Plano Ideal para Você
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-muted-foreground">
-            Oferecemos opções flexíveis para músicos e clientes, com recursos
+            Oferecemos opções flexíveis para músicos e contratantes, com recursos
             que se adaptam às suas necessidades
           </p>
           <div className="flex justify-center gap-2 sm:gap-4 flex-wrap">
@@ -115,7 +158,7 @@ export default function PlanosPage() {
               size="sm"
               className="text-xs sm:text-sm"
             >
-              Para Clientes
+              Para Contratantes
             </Button>
           </div>
           <div className="flex items-center justify-center gap-3 sm:gap-4 mt-4">
@@ -149,30 +192,43 @@ export default function PlanosPage() {
                   ? "R$ 0" 
                   : `R$ ${(price / 100).toFixed(2).replace('.', ',')}`;
                 const isProcessing = processingPlanId === plan.id;
+                const isFeatured = Boolean(plan.badge);
+                const visibleFeatures = plan.features.filter(
+                  (feature) => !/estat[ií]stic/i.test(feature.text),
+                );
                 return (
                   <div
                     key={plan.id}
-                    className={`relative bg-card border rounded-lg p-4 sm:p-6 flex flex-col ${
-                      plan.badge ? "ring-2 ring-primary" : ""
+                    className={`group relative bg-card border rounded-xl p-4 sm:p-6 flex flex-col shadow-sm transition-all duration-300 will-change-transform hover:-translate-y-2 hover:shadow-xl ${
+                      isFeatured
+                        ? "ring-2 ring-primary border-primary/60"
+                        : "hover:border-primary/40"
                     }`}
                   >
                     {plan.badge && (
-                      <span className="absolute top-0 right-0 mt-2 mr-2 bg-primary text-primary-foreground text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded">
+                      <span className="absolute left-1/2 -translate-x-1/2 -top-3 bg-primary text-primary-foreground text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-md shadow-sm">
                         {plan.badge}
                       </span>
                     )}
-                    <h3 className="text-lg sm:text-xl font-semibold mb-1">{plan.title}</h3>
-                    <div className="flex items-baseline gap-1 mb-2">
+                    <h3 className={`text-xl sm:text-2xl font-extrabold tracking-tight text-center mb-1 ${
+                      isFeatured ? "text-primary" : "text-foreground"
+                    }`}>
+                      {plan.title}
+                    </h3>
+                    <div className={`mx-auto mb-3 h-1 w-14 rounded-full transition-colors ${
+                      isFeatured ? "bg-primary" : "bg-primary/25 group-hover:bg-primary/50"
+                    }`} />
+                    <div className="flex items-baseline justify-center gap-1 mb-2">
                       <span className="text-2xl sm:text-3xl font-bold text-primary">
                         {formattedPrice}
                       </span>
                       {price !== 0 && <span className="text-xs sm:text-sm">/mês</span>}
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 min-h-[40px] sm:min-h-[48px]">
+                    <p className="text-xs sm:text-sm text-muted-foreground text-center mb-3 sm:mb-4 min-h-[40px] sm:min-h-[48px]">
                       {plan.description}
                     </p>
                     <ul className="space-y-1.5 sm:space-y-2 flex-1 mb-4 sm:mb-6">
-                      {plan.features.map((feature) => (
+                      {visibleFeatures.map((feature) => (
                         <li
                           key={feature.id}
                           className={`flex items-center gap-2 text-xs sm:text-sm ${
@@ -194,8 +250,12 @@ export default function PlanosPage() {
                       ))}
                     </ul>
                     <Button
-                      className="w-full mt-auto text-sm"
-                      variant={plan.monthlyPrice === 0 ? "outline" : "default"}
+                      className={`w-full mt-auto text-sm font-semibold transition-colors ${
+                        isFeatured
+                          ? ""
+                          : "border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                      }`}
+                      variant={isFeatured ? "default" : "outline"}
                       onClick={() => handleSubscribe(plan)}
                       disabled={isProcessing}
                     >
@@ -242,16 +302,12 @@ export default function PlanosPage() {
         <div className="container mx-auto px-4 text-center space-y-3 sm:space-y-4">
           <h2 className="text-xl sm:text-2xl font-bold">Pronto para Começar?</h2>
           <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
-            Junte‑se a milhares de músicos e clientes que já encontraram o match
-            perfeito
+            Conecte-se com músicos e contratantes e encontre o match perfeito.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Button size="default" className="w-full sm:w-auto" asChild>
               <Link href="/cadastro">Começar Agora</Link>
-            </Button>
-            <Button variant="outline" size="default" className="w-full sm:w-auto" asChild>
-              <Link href="/contato">Falar com Vendas</Link>
-            </Button>
+            </Button>           
           </div>
         </div>
       </section>

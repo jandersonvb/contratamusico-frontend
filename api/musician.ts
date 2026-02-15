@@ -102,3 +102,114 @@ export async function fetchMusicianById(id: number): Promise<MusicianProfile> {
 
   return response.json();
 }
+
+export interface UpdateMyMusicianProfileData {
+  category?: string;
+  bio?: string;
+  location?: string;
+  priceFrom?: number;
+  experience?: string;
+  equipment?: string;
+  availability?: string;
+}
+
+function getAuthToken(): string {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('Token não encontrado');
+  }
+  return token;
+}
+
+/**
+ * Busca o perfil do músico logado
+ */
+export async function getMyMusicianProfile(): Promise<MusicianProfile> {
+  const token = getAuthToken();
+
+  const response = await fetch(`${API_URL}/musicians/me`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao buscar perfil do músico');
+  }
+
+  return response.json();
+}
+
+/**
+ * Atualiza dados do perfil do músico logado
+ */
+export async function updateMyMusicianProfile(
+  data: UpdateMyMusicianProfileData
+): Promise<MusicianProfile> {
+  const token = getAuthToken();
+
+  const response = await fetch(`${API_URL}/musicians/me`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao atualizar perfil do músico');
+  }
+
+  return response.json();
+}
+
+/**
+ * Atualiza gêneros do músico logado
+ */
+export async function updateMyMusicianGenres(genres: string[]): Promise<MusicianProfile> {
+  const token = getAuthToken();
+
+  const response = await fetch(`${API_URL}/musicians/me/genres`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ genres }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao atualizar gêneros');
+  }
+
+  return response.json();
+}
+
+/**
+ * Atualiza instrumentos do músico logado
+ */
+export async function updateMyMusicianInstruments(instruments: string[]): Promise<MusicianProfile> {
+  const token = getAuthToken();
+
+  const response = await fetch(`${API_URL}/musicians/me/instruments`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ instruments }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || 'Erro ao atualizar instrumentos');
+  }
+
+  return response.json();
+}

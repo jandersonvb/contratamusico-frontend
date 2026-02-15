@@ -335,15 +335,14 @@ export async function sendMessage(data: SendMessageData): Promise<SendMessageRes
 
   let response: Response;
 
-  // Conversa existente
+  // Mantém compatibilidade com backend atual: envio via rota legada /chat/messages.
   if (conversationId && typeof conversationId === 'number' && !isNaN(conversationId)) {
-    response = await fetchWithChatFallback(`/conversations/${conversationId}/messages`, {
+    response = await fetch(getChatMessagesEndpoint(), {
       method: 'POST',
       headers: requestHeaders,
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ conversationId, content }),
     });
   } else {
-    // Nova conversa
     if (!recipientUserId || typeof recipientUserId !== 'number' || isNaN(recipientUserId)) {
       throw new Error('ID do destinatário inválido');
     }

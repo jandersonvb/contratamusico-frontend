@@ -4,6 +4,11 @@ export enum UserType {
   MUSICIAN = 'MUSICIAN',
 }
 
+export enum UserRole {
+  USER = 'USER',
+  ADMIN = 'ADMIN',
+}
+
 // Interface baseada no retorno do backend (UserWithProfile)
 export interface MusicianGenre {
   id: number;
@@ -44,6 +49,7 @@ export interface User {
   firstName: string;
   lastName: string;
   userType: UserType;
+  role: UserRole;
   phone?: string;
   city?: string;
   state?: string;

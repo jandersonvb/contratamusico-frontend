@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DynamicFAQ } from "./components/DynamicFAQ";
+import { createContact } from "@/api/contact";
 
 /**
  * Contact page replicating the structure of contato.html. It features
@@ -90,17 +91,14 @@ export default function ContatoPage() {
     }
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
+      await createContact({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone || undefined,
+        subject: form.subject,
+        message: form.message,
       });
-
-      if (!response.ok) {
-        throw new Error("Erro ao enviar mensagem");
-      }
 
       toast.success("Mensagem enviada com sucesso! Responderemos em breve.");
       setForm({

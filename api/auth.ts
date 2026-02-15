@@ -47,14 +47,18 @@ export async function requestPasswordReset(email: string): Promise<{ message: st
   }
 }
 
-export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+export async function resetPassword(
+  token: string,
+  password: string,
+  confirmPassword: string
+): Promise<{ message: string }> {
   try {
     const response = await fetch(`${API_URL}/auth/reset-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify({ token, password, confirmPassword }),
     });
 
     if (!response.ok) {

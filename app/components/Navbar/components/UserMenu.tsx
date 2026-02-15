@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 // import { Skeleton } from "@/components/ui/skeleton"; // Commented out due to missing module
-import { User2, LayoutGrid, LogOut, Heart, MessageCircle } from "lucide-react";
+import { User2, LayoutGrid, LogOut, Heart, MessageCircle, Shield } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useChatStore } from "@/lib/stores/chatStore";
+import { UserRole } from "@/lib/types/user";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Util: pega iniciais e encurta e-mail
@@ -131,6 +132,15 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
 
+        {user?.role === UserRole.ADMIN && (
+          <DropdownMenuItem asChild className="gap-2">
+            <Link href="/admin" className="flex items-center">
+              <Shield className="h-4 w-4" />
+              <span>Admin</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem onClick={handleLogout} className="gap-2 text-red-600 focus:text-red-600">
@@ -141,4 +151,3 @@ export function UserMenu() {
     </DropdownMenu>
   );
 }
-

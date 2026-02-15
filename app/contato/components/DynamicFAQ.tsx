@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/accordion";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getFaq } from "@/api/faq";
 
 interface FAQItem {
   id: string | number;
@@ -17,7 +18,6 @@ interface FAQItem {
 }
 
 export function DynamicFAQ() {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -25,9 +25,7 @@ export function DynamicFAQ() {
   useEffect(() => {
     async function fetchFAQs() {
       try {
-        const response = await fetch(`${API_URL}/faq`);
-        if (!response.ok) throw new Error("Failed to fetch");
-        const data = await response.json();
+        const data = await getFaq();
         setFaqs(data);
       } catch (err) {
         console.error(err);
