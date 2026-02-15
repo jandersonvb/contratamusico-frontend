@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useSocket } from "@/hooks/useSocket";
-import { getConversationMessagesPaginated } from "@/api/chat";
+import { getConversationMessagesPaginated, sendMediaMessage } from "@/api/chat";
 import { MessageBubble } from "@/app/mensagens/components/MessageBubble";
 import { TypingIndicator } from "@/app/mensagens/components/TypingIndicator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,8 +17,10 @@ import {
   Maximize2,
   Send,
   Loader2,
+  Paperclip,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export function FloatingChat() {
   const pathname = usePathname();
@@ -51,7 +53,9 @@ export function FloatingChat() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const fetchingRef = useRef(false);
   const loadingMoreRef = useRef(false);
   const scrollDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -246,14 +250,38 @@ export function FloatingChat() {
 
   // ─── Enviar mensagem ────────────────────────────────────────────
   const handleSend = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       const trimmed = inputValue.trim();
-      if (!trimmed || !conversationId || isSending) return;
+      const hasText = trimmed.length > 0;
+      const hasFile = Boolean(selectedFile);
+      if ((!hasText && !hasFile) || !conversationId || isSending || !isConnected) return;
 
       setIsSending(true);
       clearTimeout(typingTimeoutRef.current);
       emit("typing:stop", { conversationId });
+
+      if (selectedFile) {
+        try {
+          await sendMediaMessage({
+            file: selectedFile,
+            conversationId,
+            content: hasText ? trimmed : undefined,
+          });
+          setInputValue("");
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Erro ao enviar mídia";
+          toast.error(message);
+        } finally {
+          setIsSending(false);
+        }
+        return;
+      }
 
       emit(
         "message:send",
@@ -262,6 +290,7 @@ export function FloatingChat() {
           const res = response as { success: boolean; error?: string };
           if (!res.success) {
             console.error("[FloatingChat] Erro ao enviar:", res.error);
+            toast.error(res.error || "Erro ao enviar mensagem");
           }
         }
       );
@@ -269,7 +298,7 @@ export function FloatingChat() {
       setInputValue("");
       setIsSending(false);
     },
-    [inputValue, conversationId, isSending, emit]
+    [inputValue, selectedFile, conversationId, isSending, isConnected, emit]
   );
 
   // ─── Typing indicator ──────────────────────────────────────────
@@ -291,6 +320,19 @@ export function FloatingChat() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -469,8 +511,28 @@ export function FloatingChat() {
           {/* Input */}
           <form
             onSubmit={handleSend}
-            className="border-t bg-background px-2.5 py-2 flex items-center gap-2"
+            className="relative border-t bg-background px-2.5 py-2 flex items-center gap-2"
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={!isConnected || isSending}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isConnected || isSending}
+              className="rounded-full h-8 w-8 shrink-0"
+              aria-label="Anexar arquivo"
+              title="Anexar arquivo"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+            </Button>
             <Input
               value={inputValue}
               onChange={handleInputChange}
@@ -480,14 +542,14 @@ export function FloatingChat() {
                 emit("message:read", { conversationId });
                 markConversationAsRead(conversationId);
               }}
-              placeholder="Aa"
+              placeholder={selectedFile ? "Legenda (opcional)" : "Aa"}
               disabled={!isConnected || isSending}
               className="flex-1 h-9 text-sm rounded-full bg-muted/50 border-0 focus-visible:ring-1 px-3"
               autoComplete="off"
             />
             <Button
               type="submit"
-              disabled={!inputValue.trim() || isSending || !isConnected}
+              disabled={(!inputValue.trim() && !selectedFile) || isSending || !isConnected}
               size="icon"
               className="rounded-full h-8 w-8 shrink-0"
             >
@@ -497,6 +559,20 @@ export function FloatingChat() {
                 <Send className="h-3.5 w-3.5" />
               )}
             </Button>
+
+            {selectedFile && (
+              <div className="absolute -top-8 left-2.5 right-2.5 flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1 text-[11px] shadow-sm">
+                <span className="truncate">{selectedFile.name}</span>
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Remover arquivo selecionado"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </form>
         </>
       </div>

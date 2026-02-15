@@ -33,13 +33,7 @@ export function ConversationItem({
     .toUpperCase();
 
   // Última mensagem
-  const lastMessageText =
-    typeof conversation.lastMessage === "object" &&
-    conversation.lastMessage !== null
-      ? (conversation.lastMessage as LastMessage).content || ""
-      : typeof conversation.lastMessage === "string"
-      ? conversation.lastMessage
-      : "";
+  const lastMessageText = getLastMessagePreview(conversation.lastMessage);
 
   // Hora/data da última mensagem
   const lastDate = conversation.lastMessageAt
@@ -119,6 +113,33 @@ export function ConversationItem({
       </div>
     </button>
   );
+}
+
+function getLastMessagePreview(lastMessage: Conversation["lastMessage"]): string {
+  if (typeof lastMessage === "string") {
+    return lastMessage;
+  }
+
+  if (!lastMessage || typeof lastMessage !== "object") {
+    return "";
+  }
+
+  const typedMessage = lastMessage as LastMessage;
+  const content = typedMessage.content?.trim() ?? "";
+  if (content) {
+    return content;
+  }
+
+  switch (typedMessage.type) {
+    case "AUDIO":
+      return "Mensagem de áudio";
+    case "IMAGE":
+      return "Imagem";
+    case "VIDEO":
+      return "Vídeo";
+    default:
+      return "Mensagem";
+  }
 }
 
 /**

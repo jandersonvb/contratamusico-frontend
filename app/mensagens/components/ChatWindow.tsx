@@ -8,6 +8,7 @@ import {
   getConversationMessagesPaginated,
   getMyConversations,
   sendMessage,
+  sendMediaMessage,
 } from "@/api/chat";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -16,6 +17,7 @@ import { Loader2, MessageCircle, ArrowLeft, Wifi, WifiOff, Send } from "lucide-r
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Conversation } from "@/api/chat";
 import type { PendingMusician } from "../page";
+import { toast } from "sonner";
 
 interface ChatWindowProps {
   conversation: Conversation | null;
@@ -241,6 +243,8 @@ export function ChatWindow({
           id: optimisticId,
           conversationId,
           content,
+          type: "TEXT",
+          media: null,
           senderId: user?.id ?? 0,
           isRead: true,
           createdAt,
@@ -332,6 +336,98 @@ export function ChatWindow({
       removeMessage,
       updateConversationLastMessage,
       isConnected,
+      user?.id,
+    ]
+  );
+
+  const handleSendMedia = useCallback(
+    async (file: File, content?: string) => {
+      const caption = content?.trim();
+
+      const sendFirstMediaViaRest = async () => {
+        if (!pendingMusician) return;
+
+        const result = await sendMediaMessage({
+          file,
+          content: caption,
+          recipientUserId: pendingMusician.userId,
+          musicianProfileId: pendingMusician.id,
+        });
+
+        const convs = await getMyConversations();
+        setConversations(convs);
+
+        if (result.conversationId) {
+          onConversationCreated?.(result.conversationId);
+          return;
+        }
+
+        const newConversation = convs.find(
+          (c) =>
+            c.otherParty?.id === pendingMusician.userId ||
+            c.musicianProfileId === pendingMusician.id
+        );
+
+        if (newConversation) {
+          onConversationCreated?.(newConversation.id);
+        }
+      };
+
+      try {
+        if (conversationId) {
+          const result = await sendMediaMessage({
+            file,
+            content: caption,
+            conversationId,
+          });
+
+          const createdAt = result.createdAt || new Date().toISOString();
+          const normalizedContent = result.content || caption || "";
+
+          if (result.id) {
+            addMessage(conversationId, {
+              id: result.id,
+              conversationId: result.conversationId || conversationId,
+              senderId: result.senderId || user?.id || 0,
+              content: normalizedContent,
+              type: result.type,
+              media: result.media ?? null,
+              isRead: Boolean(result.isRead),
+              createdAt,
+            });
+          }
+
+          updateConversationLastMessage(conversationId, normalizedContent, createdAt, {
+            content: normalizedContent,
+            type: result.type,
+            media: result.media ?? null,
+            createdAt,
+            isRead: true,
+          });
+          emit("typing:stop", { conversationId });
+          return;
+        }
+
+        if (pendingMusician) {
+          setSendingFirst(true);
+          await sendFirstMediaViaRest();
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Erro ao enviar mídia";
+        toast.error(message);
+      } finally {
+        setSendingFirst(false);
+      }
+    },
+    [
+      conversationId,
+      pendingMusician,
+      setConversations,
+      onConversationCreated,
+      addMessage,
+      updateConversationLastMessage,
+      emit,
       user?.id,
     ]
   );
@@ -501,6 +597,7 @@ export function ChatWindow({
       {/* Input */}
       <ChatInput
         onSend={handleSend}
+        onSendMedia={handleSendMedia}
         onTyping={handleTyping}
         onFocusInput={handleFocusInput}
         disabled={sendingFirst}

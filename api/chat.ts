@@ -22,6 +22,13 @@ function getChatMessagesEndpoint() {
     : `${trimmedApiUrl}/chat/messages`;
 }
 
+function getChatMediaMessagesEndpoint() {
+  const trimmedApiUrl = API_URL.replace(/\/$/, '');
+  return trimmedApiUrl.endsWith('/chat')
+    ? `${trimmedApiUrl}/messages/media`
+    : `${trimmedApiUrl}/chat/messages/media`;
+}
+
 /**
  * Wrapper de fetch com retry automático para erros 429 (Too Many Requests).
  * Usa backoff exponencial: 1s, 2s, 4s...
@@ -85,8 +92,20 @@ export interface Message {
   conversationId: number;
   senderId: number;
   content: string;
+  type?: ChatMessageType;
+  media?: MessageMedia | null;
   isRead: boolean;
   createdAt: string;
+}
+
+export type ChatMessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO';
+
+export interface MessageMedia {
+  key: string;
+  url?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+  fileName?: string | null;
 }
 
 export interface ConversationParticipant {
@@ -98,6 +117,8 @@ export interface ConversationParticipant {
 
 export interface LastMessage {
   content: string;
+  type?: ChatMessageType;
+  media?: MessageMedia | null;
   createdAt: string;
   isRead: boolean;
 }
@@ -113,7 +134,7 @@ export interface Conversation {
   clientName?: string;
   musicianName?: string;
   unreadCount?: number;
-  lastMessage?: string | LastMessage;
+  lastMessage?: string | LastMessage | null;
   otherParty?: ConversationParticipant;
 }
 
@@ -124,11 +145,21 @@ export interface SendMessageData {
   content: string;
 }
 
+export interface SendMediaMessageData {
+  file: File;
+  conversationId?: number;
+  recipientUserId?: number;
+  musicianProfileId?: number;
+  content?: string;
+}
+
 export interface SendMessageResponse {
   id?: number;
   conversationId?: number;
   senderId?: number;
   content?: string;
+  type?: ChatMessageType;
+  media?: MessageMedia | null;
   isRead?: boolean;
   createdAt?: string;
 }
@@ -139,6 +170,88 @@ export interface PaginatedMessagesResponse {
   nextCursor: number | null;
 }
 
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (value == null || value === '') return undefined;
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+function normalizeMedia(raw: Record<string, unknown>): MessageMedia | null {
+  const directMedia = raw.media;
+
+  if (directMedia && typeof directMedia === 'object') {
+    const mediaObj = directMedia as Record<string, unknown>;
+    if (typeof mediaObj.key === 'string' && mediaObj.key.trim()) {
+      return {
+        key: mediaObj.key,
+        url:
+          typeof mediaObj.url === 'string'
+            ? mediaObj.url
+            : mediaObj.url == null
+              ? null
+              : String(mediaObj.url),
+        mimeType:
+          typeof mediaObj.mimeType === 'string'
+            ? mediaObj.mimeType
+            : mediaObj.mimeType == null
+              ? null
+              : String(mediaObj.mimeType),
+        size: toNumberOrUndefined(mediaObj.size) ?? null,
+        fileName:
+          typeof mediaObj.fileName === 'string'
+            ? mediaObj.fileName
+            : mediaObj.fileName == null
+              ? null
+              : String(mediaObj.fileName),
+      };
+    }
+  }
+
+  if (typeof raw.mediaKey === 'string' && raw.mediaKey.trim()) {
+    return {
+      key: raw.mediaKey,
+      url:
+        typeof raw.mediaUrl === 'string'
+          ? raw.mediaUrl
+          : raw.mediaUrl == null
+            ? null
+            : String(raw.mediaUrl),
+      mimeType:
+        typeof raw.mediaMimeType === 'string'
+          ? raw.mediaMimeType
+          : raw.mediaMimeType == null
+            ? null
+            : String(raw.mediaMimeType),
+      size: toNumberOrUndefined(raw.mediaSize) ?? null,
+      fileName:
+        typeof raw.mediaFileName === 'string'
+          ? raw.mediaFileName
+          : raw.mediaFileName == null
+            ? null
+            : String(raw.mediaFileName),
+    };
+  }
+
+  return null;
+}
+
+function normalizeMessage(raw: unknown): Message {
+  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const media = normalizeMedia(data);
+  const type = (typeof data.type === 'string' ? data.type : undefined) as ChatMessageType | undefined;
+
+  return {
+    id: toNumberOrUndefined(data.id) ?? 0,
+    conversationId: toNumberOrUndefined(data.conversationId) ?? 0,
+    senderId: toNumberOrUndefined(data.senderId) ?? 0,
+    content: typeof data.content === 'string' ? data.content : '',
+    type,
+    media,
+    isRead: Boolean(data.isRead),
+    createdAt: data.createdAt ? String(data.createdAt) : new Date().toISOString(),
+  };
+}
+
 /**
  * Normaliza os dados da conversa para garantir formato consistente
  */
@@ -146,16 +259,22 @@ function normalizeConversation(conv: Record<string, unknown>): Conversation {
   const rawLastMessage = conv.lastMessage;
   const rawOtherParty = conv.otherParty as ConversationParticipant | undefined;
 
-  // Normaliza lastMessage se for objeto
-  const lastMessageContent =
-    rawLastMessage &&
-    typeof rawLastMessage === "object" &&
-    "content" in rawLastMessage &&
-    typeof (rawLastMessage as { content?: unknown }).content === "string"
-      ? (rawLastMessage as { content: string }).content
-      : typeof rawLastMessage === "string"
-      ? rawLastMessage
-      : "";
+  let normalizedLastMessage: string | LastMessage | null = null;
+  if (typeof rawLastMessage === 'string') {
+    normalizedLastMessage = rawLastMessage;
+  } else if (rawLastMessage && typeof rawLastMessage === 'object') {
+    const messageObject = rawLastMessage as Record<string, unknown>;
+    normalizedLastMessage = {
+      content: typeof messageObject.content === 'string' ? messageObject.content : '',
+      type:
+        typeof messageObject.type === 'string'
+          ? (messageObject.type as ChatMessageType)
+          : undefined,
+      media: normalizeMedia(messageObject),
+      createdAt: messageObject.createdAt ? String(messageObject.createdAt) : '',
+      isRead: Boolean(messageObject.isRead),
+    };
+  }
 
   // Garante que IDs são números
   const id = typeof conv.id === "number" ? conv.id : parseInt(String(conv.id));
@@ -193,17 +312,10 @@ function normalizeConversation(conv: Record<string, unknown>): Conversation {
     unreadCount,
     clientName: rawOtherParty?.type === 'client' ? rawOtherParty.name : (conv.clientName as string | undefined),
     musicianName: rawOtherParty?.type === 'musician' ? rawOtherParty.name : (conv.musicianName as string | undefined),
-    lastMessage: lastMessageContent,
+    lastMessage: normalizedLastMessage,
     otherParty: rawOtherParty,
   };
-  
-  console.log('✅ Conversa normalizada:', {
-    id: normalized.id,
-    musicianProfileId: normalized.musicianProfileId,
-    clientId: normalized.clientId,
-    otherPartyName: rawOtherParty?.name
-  });
-  
+
   return normalized;
 }
 
@@ -264,10 +376,13 @@ export async function getConversationMessages(conversationId: number): Promise<M
   }
 
   const data = await response.json();
-  
-  // O backend retorna um objeto com { messages: [...] }
-  // Extrai apenas o array de mensagens
-  return Array.isArray(data) ? data : (data.messages || []);
+
+  const rawMessages = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.messages)
+      ? data.messages
+      : [];
+  return rawMessages.map((message: unknown) => normalizeMessage(message));
 }
 
 /**
@@ -310,7 +425,9 @@ export async function getConversationMessagesPaginated(
   const data = await response.json();
 
   return {
-    messages: Array.isArray(data.messages) ? data.messages : [],
+    messages: Array.isArray(data.messages)
+      ? data.messages.map((message: unknown) => normalizeMessage(message))
+      : [],
     hasMore: data.hasMore ?? false,
     nextCursor: data.nextCursor ?? null,
   };
@@ -361,10 +478,61 @@ export async function sendMessage(data: SendMessageData): Promise<SendMessageRes
   }
 
   const result = await response.json();
-  
-  // O backend retorna { message: '...', data: {...} }
-  // Retorna apenas os dados da mensagem
-  return result.data || result;
+
+  return normalizeMessage(result.data || result);
+}
+
+/**
+ * Envia mídia (imagem, vídeo ou áudio)
+ */
+export async function sendMediaMessage(data: SendMediaMessageData): Promise<SendMessageResponse> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Você precisa estar logado para enviar mensagens');
+  }
+
+  const { file, conversationId, recipientUserId, musicianProfileId, content } = data;
+
+  if (!file) {
+    throw new Error('Arquivo de mídia é obrigatório');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  if (content && content.trim()) {
+    formData.append('content', content.trim());
+  }
+
+  if (conversationId && typeof conversationId === 'number' && !isNaN(conversationId)) {
+    formData.append('conversationId', String(conversationId));
+  }
+
+  if (recipientUserId && typeof recipientUserId === 'number' && !isNaN(recipientUserId)) {
+    formData.append('recipientUserId', String(recipientUserId));
+  }
+
+  if (musicianProfileId && typeof musicianProfileId === 'number' && !isNaN(musicianProfileId)) {
+    formData.append('musicianProfileId', String(musicianProfileId));
+  }
+
+  const response = await fetch(getChatMediaMessagesEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao enviar mídia';
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  return normalizeMessage(result.data || result);
 }
 
 /**
