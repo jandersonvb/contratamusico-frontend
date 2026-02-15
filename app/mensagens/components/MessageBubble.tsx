@@ -1,6 +1,7 @@
 "use client";
 
 import type { Message } from "@/api/chat";
+import Image from "next/image";
 import { Check, CheckCheck } from "lucide-react";
 
 interface MessageBubbleProps {
@@ -16,6 +17,11 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
       })
     : "";
 
+  const messageType = message.type ?? "TEXT";
+  const content = String(message.content || "").trim();
+  const mediaUrl = message.media?.url ?? null;
+  const hasMedia = Boolean(message.media);
+
   return (
     <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
       <div
@@ -25,9 +31,56 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
             : "bg-muted text-foreground rounded-bl-sm"
         }`}
       >
-        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-          {String(message.content || "")}
-        </p>
+        {hasMedia && (
+          <div className="mb-1.5">
+            {(messageType === "IMAGE" || message.media?.mimeType?.startsWith("image/")) && mediaUrl && (
+              <Image
+                src={mediaUrl}
+                alt={message.media?.fileName || "Imagem enviada"}
+                width={720}
+                height={720}
+                unoptimized
+                className="rounded-xl max-h-64 w-auto object-cover"
+                loading="lazy"
+              />
+            )}
+
+            {(messageType === "VIDEO" || message.media?.mimeType?.startsWith("video/")) && mediaUrl && (
+              <video
+                src={mediaUrl}
+                controls
+                className="rounded-xl max-h-72 w-full"
+                preload="metadata"
+              />
+            )}
+
+            {(messageType === "AUDIO" || message.media?.mimeType?.startsWith("audio/")) && mediaUrl && (
+              <audio
+                src={mediaUrl}
+                controls
+                className="w-full max-w-xs"
+                preload="metadata"
+              />
+            )}
+
+            {!mediaUrl && (
+              <p className="text-xs opacity-80">Arquivo de mídia indisponível.</p>
+            )}
+          </div>
+        )}
+
+        {content && (
+          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+            {content}
+          </p>
+        )}
+
+        {!content && !hasMedia && (
+          <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+            Mensagem
+          </p>
+        )}
+
         <div
           className={`flex items-center gap-1 mt-1 ${
             isMine ? "justify-end" : "justify-start"

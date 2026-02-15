@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { Conversation, Message } from "@/api/chat";
+import type { Conversation, LastMessage, Message } from "@/api/chat";
 
 interface TypingUser {
   userId: number;
@@ -10,6 +10,26 @@ interface TypingUser {
 interface ConversationPagination {
   hasMore: boolean;
   nextCursor: number | null;
+}
+
+function getSyncedUnreadCount(
+  conversations: Conversation[],
+  fallbackUnreadCount: number
+): number {
+  const hasUnreadMetadata = conversations.some(
+    (conversation) => typeof conversation.unreadCount === "number"
+  );
+
+  if (!hasUnreadMetadata) {
+    return fallbackUnreadCount;
+  }
+
+  return conversations.reduce((total, conversation) => {
+    if (typeof conversation.unreadCount !== "number") {
+      return total;
+    }
+    return total + Math.max(0, conversation.unreadCount);
+  }, 0);
 }
 
 interface ChatState {
@@ -45,7 +65,8 @@ interface ChatState {
   updateConversationLastMessage: (
     conversationId: number,
     content: string,
-    date: string
+    date: string,
+    lastMessage?: string | LastMessage
   ) => void;
   addConversation: (conversation: Conversation) => void;
   setLoadingConversations: (loading: boolean) => void;
@@ -78,7 +99,14 @@ export const useChatStore = create<ChatState>()(
       ...initialState,
 
       setConversations: (conversations) =>
-        set({ conversations }, false, "chat/setConversations"),
+        set(
+          (state) => ({
+            conversations,
+            unreadCount: getSyncedUnreadCount(conversations, state.unreadCount),
+          }),
+          false,
+          "chat/setConversations"
+        ),
 
       selectConversation: (id) =>
         set({ selectedConversationId: id }, false, "chat/selectConversation"),
@@ -187,7 +215,13 @@ export const useChatStore = create<ChatState>()(
           (state) => {
             const prevUnread =
               state.conversations.find((c) => c.id === conversationId)?.unreadCount ?? 0;
-            const nextUnread = Math.max(0, state.unreadCount - prevUnread);
+            const updatedConversations = state.conversations.map((c) =>
+              c.id === conversationId ? { ...c, unreadCount: 0 } : c
+            );
+            const nextUnread = getSyncedUnreadCount(
+              updatedConversations,
+              Math.max(0, state.unreadCount - prevUnread)
+            );
 
             return {
               messages: {
@@ -197,9 +231,7 @@ export const useChatStore = create<ChatState>()(
                 ),
               },
               // Zera o unreadCount da conversa na lista
-              conversations: state.conversations.map((c) =>
-                c.id === conversationId ? { ...c, unreadCount: 0 } : c
-              ),
+              conversations: updatedConversations,
               unreadCount: nextUnread,
             };
           },
@@ -263,13 +295,23 @@ export const useChatStore = create<ChatState>()(
         return nextUnread;
       },
 
-      updateConversationLastMessage: (conversationId, content, date) =>
+      updateConversationLastMessage: (conversationId, content, date, lastMessage) =>
         set(
           (state) => {
             // Move a conversa atualizada para o topo
             const updated = state.conversations.map((c) =>
               c.id === conversationId
-                ? { ...c, lastMessage: content, lastMessageAt: date }
+                ? {
+                    ...c,
+                    lastMessage:
+                      lastMessage ??
+                      ({
+                        content,
+                        createdAt: date,
+                        isRead: true,
+                      } satisfies LastMessage),
+                    lastMessageAt: date,
+                  }
                 : c
             );
             updated.sort(

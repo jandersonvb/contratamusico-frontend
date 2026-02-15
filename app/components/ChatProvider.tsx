@@ -6,12 +6,20 @@ import { useSocket } from "@/hooks/useSocket";
 import { useChatStore } from "@/lib/stores/chatStore";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useFavoriteStore } from "@/lib/stores/favoriteStore";
-import { getUnreadCount, getMyConversations } from "@/api/chat";
+import {
+  getUnreadCount,
+  getMyConversations,
+  type ChatMessageType,
+  type LastMessage,
+  type MessageMedia,
+} from "@/api/chat";
 
 interface SocketMessagePayload {
   id: number;
   conversationId: number;
   content: string;
+  type?: ChatMessageType;
+  media?: MessageMedia | null;
   senderId: number;
   sender?: {
     id: number;
@@ -231,14 +239,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         id: msg.id,
         conversationId: msg.conversationId,
         content: msg.content,
+        type: msg.type,
+        media: msg.media ?? null,
         senderId: msg.senderId,
         isRead: msg.isRead,
         createdAt: msg.createdAt,
       });
+      const lastMessage: LastMessage = {
+        content: msg.content,
+        type: msg.type,
+        media: msg.media ?? null,
+        createdAt: msg.createdAt,
+        isRead: msg.isRead,
+      };
       updateConversationLastMessage(
         msg.conversationId,
         msg.content,
-        msg.createdAt
+        msg.createdAt,
+        lastMessage
       );
 
       // Atualiza contador se a mensagem não é do usuário atual
