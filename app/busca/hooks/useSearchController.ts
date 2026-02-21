@@ -3,11 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSearchStore } from "@/lib/stores/searchStore";
-import { SearchFilters } from "@/lib/types/search";
+import { SearchFilters, SearchSortBy } from "@/lib/types/search";
 import { buildSearchUrlQuery, parseSearchStateFromUrl } from "@/lib/search/url";
 import { countActiveFilters } from "@/lib/search/filters";
 
 const SEARCH_DEBOUNCE_MS = 350;
+const ALLOWED_SORTS = new Set<SearchSortBy>([
+  "rating",
+  "price-low",
+  "price-high",
+  "newest",
+  "verified",
+]);
 
 export function useSearchController() {
   const router = useRouter();
@@ -93,7 +100,8 @@ export function useSearchController() {
 
   const changeSort = useCallback(
     (nextSort: string) => {
-      setSortBy(nextSort);
+      if (!ALLOWED_SORTS.has(nextSort as SearchSortBy)) return;
+      setSortBy(nextSort as SearchSortBy);
       setPage(1);
     },
     [setSortBy, setPage]
@@ -126,4 +134,3 @@ export function useSearchController() {
     activeFiltersCount,
   };
 }
-

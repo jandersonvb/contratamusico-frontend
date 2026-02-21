@@ -50,6 +50,7 @@ export function SearchFilters({
   className,
 }: SearchFiltersProps) {
   const isPanel = mode === "panel";
+  const isClientSearch = filters.userType === "client";
   const [instrumentQuery, setInstrumentQuery] = useState("");
   const [genreQuery, setGenreQuery] = useState("");
 
@@ -133,177 +134,181 @@ export function SearchFilters({
         defaultValue={[]}
         className="space-y-2"
       >
-        {/* Instrumentos */}
-        <AccordionItem value="instruments">
-          <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
-            <Guitar className="h-4 w-4" /> Instrumentos
-          </AccordionTrigger>
-          <AccordionContent className="pt-2 space-y-2">
-            <Input
-              value={instrumentQuery}
-              onChange={(e) => setInstrumentQuery(e.target.value)}
-              placeholder="Filtrar instrumentos..."
-              className="h-9"
-            />
-            {isLoadingInstruments ? (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            ) : (
-              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                {filteredInstruments.map((instrument) => (
-                  <Label
-                    key={instrument.slug}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <Checkbox
-                      id={`instruments-${instrument.slug}`}
-                      checked={filters.instruments.includes(instrument.slug)}
-                      onCheckedChange={() =>
-                        toggleArrayValue("instruments", instrument.slug)
-                      }
-                    />
-                    <span>{instrument.name}</span>
-                  </Label>
-                ))}
-                {!filteredInstruments.length && (
-                  <p className="text-xs text-muted-foreground">Nenhum instrumento encontrado.</p>
-                )}
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Estilos Musicais */}
-        <AccordionItem value="genres">
-          <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
-            <Music className="h-4 w-4" /> Estilos Musicais
-          </AccordionTrigger>
-          <AccordionContent className="pt-2 space-y-2">
-            <Input
-              value={genreQuery}
-              onChange={(e) => setGenreQuery(e.target.value)}
-              placeholder="Filtrar estilos..."
-              className="h-9"
-            />
-            {isLoadingGenres ? (
-              <p className="text-sm text-muted-foreground">Carregando...</p>
-            ) : (
-              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                {filteredGenres.map((genre) => (
-                  <Label
-                    key={genre.slug}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <Checkbox
-                      id={`genres-${genre.slug}`}
-                      checked={filters.genres.includes(genre.slug)}
-                      onCheckedChange={() =>
-                        toggleArrayValue("genres", genre.slug)
-                      }
-                    />
-                    <span>{genre.name}</span>
-                  </Label>
-                ))}
-                {!filteredGenres.length && (
-                  <p className="text-xs text-muted-foreground">Nenhum estilo encontrado.</p>
-                )}
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Faixa de Preço */}
-        <AccordionItem value="price">
-          <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
-            <DollarSign className="h-4 w-4" /> Faixa de Preço
-          </AccordionTrigger>
-          <AccordionContent className="space-y-3 pt-2">
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Mín"
-                value={filters.priceMin}
-                onChange={(e) =>
-                  setFilters({ ...filters, priceMin: e.target.value })
-                }
-                className="flex-1"
-              />
-              <Input
-                type="number"
-                placeholder="Máx"
-                value={filters.priceMax}
-                onChange={(e) =>
-                  setFilters({ ...filters, priceMax: e.target.value })
-                }
-                className="flex-1"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { min: "0", max: "300", label: "Até R$ 300" },
-                { min: "300", max: "500", label: "R$ 300 - R$ 500" },
-                { min: "500", max: "800", label: "R$ 500 - R$ 800" },
-                { min: "800", max: "1200", label: "R$ 800 - R$ 1.200" },
-                { min: "1200", max: "", label: "R$ 1.200+" },
-              ].map((preset, idx) => (
-                <Button
-                  key={idx}
-                  variant={hasPricePreset(preset.min, preset.max) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    setFilters({
-                      ...filters,
-                      priceMin: preset.min,
-                      priceMax: preset.max,
-                    })
-                  }
-                >
-                  {hasPricePreset(preset.min, preset.max) && <Check className="h-3 w-3 mr-1" />}
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Avaliação */}
-        <AccordionItem value="rating">
-          <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
-            <Star className="h-4 w-4" /> Avaliação Mínima
-          </AccordionTrigger>
-          <AccordionContent className="pt-2">
-            <RadioGroup
-              value={filters.rating}
-              onValueChange={(value) =>
-                setFilters({ ...filters, rating: value })
-              }
-              className="flex flex-col gap-2"
-            >
-              {["5", "4", "3"].map((value) => (
-                <Label
-                  key={value}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <RadioGroupItem value={value} id={`rating-${value}`} />
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < parseInt(value)
-                            ? "fill-current"
-                            : "stroke-current"
-                        }`}
-                      />
+        {!isClientSearch && (
+          <>
+            {/* Instrumentos */}
+            <AccordionItem value="instruments">
+              <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
+                <Guitar className="h-4 w-4" /> Instrumentos
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 space-y-2">
+                <Input
+                  value={instrumentQuery}
+                  onChange={(e) => setInstrumentQuery(e.target.value)}
+                  placeholder="Filtrar instrumentos..."
+                  className="h-9"
+                />
+                {isLoadingInstruments ? (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {filteredInstruments.map((instrument) => (
+                      <Label
+                        key={instrument.slug}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          id={`instruments-${instrument.slug}`}
+                          checked={filters.instruments.includes(instrument.slug)}
+                          onCheckedChange={() =>
+                            toggleArrayValue("instruments", instrument.slug)
+                          }
+                        />
+                        <span>{instrument.name}</span>
+                      </Label>
                     ))}
+                    {!filteredInstruments.length && (
+                      <p className="text-xs text-muted-foreground">Nenhum instrumento encontrado.</p>
+                    )}
                   </div>
-                  <span>
-                    {value === "5" ? "5 estrelas" : `${value}+ estrelas`}
-                  </span>
-                </Label>
-              ))}
-            </RadioGroup>
-          </AccordionContent>
-        </AccordionItem>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Estilos Musicais */}
+            <AccordionItem value="genres">
+              <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
+                <Music className="h-4 w-4" /> Estilos Musicais
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 space-y-2">
+                <Input
+                  value={genreQuery}
+                  onChange={(e) => setGenreQuery(e.target.value)}
+                  placeholder="Filtrar estilos..."
+                  className="h-9"
+                />
+                {isLoadingGenres ? (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {filteredGenres.map((genre) => (
+                      <Label
+                        key={genre.slug}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          id={`genres-${genre.slug}`}
+                          checked={filters.genres.includes(genre.slug)}
+                          onCheckedChange={() =>
+                            toggleArrayValue("genres", genre.slug)
+                          }
+                        />
+                        <span>{genre.name}</span>
+                      </Label>
+                    ))}
+                    {!filteredGenres.length && (
+                      <p className="text-xs text-muted-foreground">Nenhum estilo encontrado.</p>
+                    )}
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Faixa de Preço */}
+            <AccordionItem value="price">
+              <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
+                <DollarSign className="h-4 w-4" /> Faixa de Preço
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Mín"
+                    value={filters.priceMin}
+                    onChange={(e) =>
+                      setFilters({ ...filters, priceMin: e.target.value })
+                    }
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Máx"
+                    value={filters.priceMax}
+                    onChange={(e) =>
+                      setFilters({ ...filters, priceMax: e.target.value })
+                    }
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { min: "0", max: "300", label: "Até R$ 300" },
+                    { min: "300", max: "500", label: "R$ 300 - R$ 500" },
+                    { min: "500", max: "800", label: "R$ 500 - R$ 800" },
+                    { min: "800", max: "1200", label: "R$ 800 - R$ 1.200" },
+                    { min: "1200", max: "", label: "R$ 1.200+" },
+                  ].map((preset, idx) => (
+                    <Button
+                      key={idx}
+                      variant={hasPricePreset(preset.min, preset.max) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        setFilters({
+                          ...filters,
+                          priceMin: preset.min,
+                          priceMax: preset.max,
+                        })
+                      }
+                    >
+                      {hasPricePreset(preset.min, preset.max) && <Check className="h-3 w-3 mr-1" />}
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Avaliação */}
+            <AccordionItem value="rating">
+              <AccordionTrigger className="flex items-center gap-2 text-sm font-medium">
+                <Star className="h-4 w-4" /> Avaliação Mínima
+              </AccordionTrigger>
+              <AccordionContent className="pt-2">
+                <RadioGroup
+                  value={filters.rating}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, rating: value })
+                  }
+                  className="flex flex-col gap-2"
+                >
+                  {["5", "4", "3"].map((value) => (
+                    <Label
+                      key={value}
+                      className="flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                      <RadioGroupItem value={value} id={`rating-${value}`} />
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-4 w-4 ${
+                              i < parseInt(value)
+                                ? "fill-current"
+                                : "stroke-current"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span>
+                        {value === "5" ? "5 estrelas" : `${value}+ estrelas`}
+                      </span>
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </AccordionContent>
+            </AccordionItem>
+          </>
+        )}
 
         {/* Disponibilidade */}
         <AccordionItem value="availability">

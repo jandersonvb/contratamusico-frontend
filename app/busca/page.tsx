@@ -32,6 +32,7 @@ import { useGenreStore } from "@/lib/stores/genreStore";
 import { MusicianCardSkeleton } from "./components/MusicianCardSkeleton";
 import { useSearchController } from "./hooks/useSearchController";
 import { DateFilterCalendar } from "./components/DateFilterCalendar";
+import { SearchSortBy, SearchUserTypeFilter } from "@/lib/types/search";
 
 const PRICE_PRESETS = [
   { value: "all", label: "Qualquer preco", min: "", max: "" },
@@ -41,6 +42,25 @@ const PRICE_PRESETS = [
   { value: "800-1200", label: "R$ 800 - R$ 1.200", min: "800", max: "1200" },
   { value: "1200+", label: "R$ 1.200+", min: "1200", max: "" },
 ];
+
+const SORT_OPTIONS_BY_USER_TYPE: Record<
+  SearchUserTypeFilter,
+  Array<{ value: SearchSortBy; label: string; trigger: string }>
+> = {
+  all: [
+    { value: "newest", label: "Mais Recentes", trigger: "Recentes" },
+    { value: "rating", label: "Melhor Avaliação", trigger: "Avaliação" },
+    { value: "verified", label: "Verificados primeiro", trigger: "Verificados" },
+  ],
+  musician: [
+    { value: "rating", label: "Melhor Avaliação", trigger: "Avaliação" },
+    { value: "price-low", label: "Menor Preço", trigger: "Menor Preço" },
+    { value: "price-high", label: "Maior Preço", trigger: "Maior Preço" },
+    { value: "newest", label: "Mais Recentes", trigger: "Recentes" },
+    { value: "verified", label: "Verificados primeiro", trigger: "Verificados" },
+  ],
+  client: [{ value: "newest", label: "Mais Recentes", trigger: "Recentes" }],
+};
 
 function SearchPageContent() {
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
@@ -138,7 +158,30 @@ function SearchPageContent() {
   const currentPage = pagination?.page || 1;
   const totalPages = pagination?.totalPages || 1;
   const totalResults = pagination?.total || 0;
-  const highlightedGenres = genres;
+  const highlightedGenres = filters.userType === "client" ? [] : genres;
+  const hasMusicianOnlyFilters =
+    filters.genres.length > 0 ||
+    filters.instruments.length > 0 ||
+    Boolean(filters.priceMin) ||
+    Boolean(filters.priceMax) ||
+    Boolean(filters.rating);
+  const shouldShowAllModeFilterWarning =
+    filters.userType === "all" && hasMusicianOnlyFilters;
+  const resultLabel =
+    filters.userType === "musician"
+      ? "músicos"
+      : filters.userType === "client"
+        ? "contratantes"
+        : "resultados";
+  const resultTitle =
+    filters.userType === "musician"
+      ? "Músicos Encontrados"
+      : filters.userType === "client"
+        ? "Contratantes Encontrados"
+        : "Resultados Encontrados";
+  const sortOptions = SORT_OPTIONS_BY_USER_TYPE[filters.userType];
+  const selectedSortOption =
+    sortOptions.find((option) => option.value === sortBy) || sortOptions[0];
 
   return (
     <>
@@ -164,16 +207,16 @@ function SearchPageContent() {
               onSubmit={handleSearchSubmit}
               className="mx-auto max-w-xl flex items-center gap-2"
               role="search"
-              aria-label="Buscar músicos"
+              aria-label="Buscar usuários"
             >
               <div className="flex-1 relative">
                 <Label htmlFor="search-musicians" className="sr-only">
-                  Buscar por nome, instrumento ou estilo
+                  Buscar por nome, instrumento, estilo ou localização
                 </Label>
                 <input
                   id="search-musicians"
                   type="text"
-                  placeholder="Buscar músicos..."
+                  placeholder="Buscar músicos ou contratantes..."
                   value={filters.search}
                   onChange={handleSearchInput}
                   className="w-full rounded-md border px-3 sm:px-4 py-2 text-sm sm:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
@@ -201,6 +244,28 @@ function SearchPageContent() {
           <div className="sticky top-2 z-20 bg-background/95 backdrop-blur-sm border rounded-xl p-3 sm:p-4 mb-4 shadow-sm">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2 items-center">
+                <div className="w-full sm:w-auto sm:min-w-[190px]">
+                  <Select
+                    value={filters.userType}
+                    onValueChange={(value) =>
+                      updateFilters({ userType: value as SearchUserTypeFilter })
+                    }
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      {filters.userType === "all"
+                        ? "Todos os perfis"
+                        : filters.userType === "musician"
+                          ? "Somente músicos"
+                          : "Somente contratantes"}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="musician">Músicos</SelectItem>
+                      <SelectItem value="client">Contratantes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="w-full sm:w-auto sm:min-w-[180px]">
                   <Select
                     value={filters.state || "all"}
@@ -261,29 +326,31 @@ function SearchPageContent() {
                   />
                 </div>
 
-                <div className="w-full sm:w-auto sm:min-w-[190px]">
-                  <Select
-                    value={pricePresetValue}
-                    onValueChange={(value) => {
-                      const preset = PRICE_PRESETS.find((item) => item.value === value);
-                      updateFilters({
-                        priceMin: preset?.min ?? "",
-                        priceMax: preset?.max ?? "",
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="w-full text-sm">
-                      {PRICE_PRESETS.find((item) => item.value === pricePresetValue)?.label || "Preco"}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRICE_PRESETS.map((preset) => (
-                        <SelectItem key={preset.value} value={preset.value}>
-                          {preset.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {filters.userType !== "client" && (
+                  <div className="w-full sm:w-auto sm:min-w-[190px]">
+                    <Select
+                      value={pricePresetValue}
+                      onValueChange={(value) => {
+                        const preset = PRICE_PRESETS.find((item) => item.value === value);
+                        updateFilters({
+                          priceMin: preset?.min ?? "",
+                          priceMax: preset?.max ?? "",
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-full text-sm">
+                        {PRICE_PRESETS.find((item) => item.value === pricePresetValue)?.label || "Preco"}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRICE_PRESETS.map((preset) => (
+                          <SelectItem key={preset.value} value={preset.value}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <Button
                   variant="default"
@@ -353,9 +420,9 @@ function SearchPageContent() {
           <div className="flex flex-col gap-3 sm:gap-4 mb-4">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <div>
-                <h2 className="text-xl sm:text-2xl font-semibold">Músicos Encontrados</h2>
+                <h2 className="text-xl sm:text-2xl font-semibold">{resultTitle}</h2>
                 <span className="text-xs sm:text-sm text-muted-foreground">
-                  {isLoading ? "Buscando..." : `${totalResults} músicos encontrados`}
+                  {isLoading ? "Buscando..." : `${totalResults} ${resultLabel} encontrados`}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -383,26 +450,14 @@ function SearchPageContent() {
                 <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
                 <Select value={sortBy} onValueChange={changeSort}>
                   <SelectTrigger className="flex-1 sm:w-40 text-sm">
-                    {(() => {
-                      switch (sortBy) {
-                        case "rating":
-                          return "Avaliação";
-                        case "price-low":
-                          return "Menor Preço";
-                        case "price-high":
-                          return "Maior Preço";
-                        case "newest":
-                          return "Recentes";
-                        default:
-                          return "Relevância";
-                      }
-                    })()}
+                    {selectedSortOption?.trigger || "Ordenar"}
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="rating">Melhor Avaliação</SelectItem>
-                    <SelectItem value="price-low">Menor Preço</SelectItem>
-                    <SelectItem value="price-high">Maior Preço</SelectItem>
-                    <SelectItem value="newest">Mais Recentes</SelectItem>
+                    {sortOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -511,6 +566,12 @@ function SearchPageContent() {
             ))}
           </div>
 
+          {shouldShowAllModeFilterWarning && (
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+              Filtros de músico ativos: contratantes foram ocultados nesta busca.
+            </div>
+          )}
+
           {error && (
             <div
               className="bg-destructive/10 text-destructive px-3 sm:px-4 py-3 rounded-lg mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 border border-destructive/20"
@@ -520,7 +581,7 @@ function SearchPageContent() {
               <div className="flex items-center gap-2 flex-1">
                 <AlertCircle className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm sm:text-base">Erro ao buscar músicos</p>
+                  <p className="font-medium text-sm sm:text-base">Erro ao buscar resultados</p>
                   <p className="text-xs sm:text-sm opacity-90 truncate">{error}</p>
                 </div>
               </div>
@@ -539,7 +600,7 @@ function SearchPageContent() {
             <div
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5"
               aria-busy="true"
-              aria-label="Carregando músicos"
+              aria-label="Carregando resultados"
             >
               {Array.from({ length: 8 }).map((_, i) => (
                 <MusicianCardSkeleton key={i} />
@@ -552,9 +613,9 @@ function SearchPageContent() {
               <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-muted flex items-center justify-center">
                 <Search className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" aria-hidden="true" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold mb-2">Nenhum músico encontrado</h3>
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Nenhum resultado encontrado</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
-                Não encontramos músicos com os filtros selecionados. Tente ajustar sua busca ou limpar os filtros.
+                Não encontramos {resultLabel} com os filtros selecionados. Tente ajustar sua busca ou limpar os filtros.
               </p>
               <Button
                 variant="default"
@@ -572,13 +633,17 @@ function SearchPageContent() {
               {view === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                   {musicians.map((musician) => (
-                    <MusicianCard key={musician.id} musician={musician} />
+                    <MusicianCard key={`${musician.userType}-${musician.id}`} musician={musician} />
                   ))}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 sm:gap-4">
                   {musicians.map((musician) => (
-                    <MusicianCard key={musician.id} musician={musician} view="list" />
+                    <MusicianCard
+                      key={`${musician.userType}-${musician.id}`}
+                      musician={musician}
+                      view="list"
+                    />
                   ))}
                 </div>
               )}

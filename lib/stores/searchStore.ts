@@ -1,10 +1,45 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { searchMusicians } from '@/api/musician';
-import { SearchState, SearchFilters, defaultFilters, SearchMusiciansParams } from '../types/search';
+import {
+  SearchFilters,
+  SearchMusiciansParams,
+  SearchSortBy,
+  SearchState,
+  defaultFilters,
+  getDefaultSortByForUserType,
+  isSortAllowedForUserType,
+} from '../types/search';
 
 let activeSearchController: AbortController | null = null;
 let activeSearchRequestId = 0;
+
+const DEFAULT_PAGINATION = {
+  page: 1,
+  limit: 12,
+  total: 0,
+  totalPages: 1,
+  hasMore: false,
+};
+
+function clearMusicianOnlyFilters(filters: SearchFilters): SearchFilters {
+  return {
+    ...filters,
+    genres: [],
+    instruments: [],
+    priceMin: '',
+    priceMax: '',
+    rating: '',
+  };
+}
+
+function normalizeSortBy(sortBy: SearchSortBy, userType: SearchFilters['userType']): SearchSortBy {
+  if (isSortAllowedForUserType(sortBy, userType)) {
+    return sortBy;
+  }
+
+  return getDefaultSortByForUserType(userType);
+}
 
 export const useSearchStore = create<SearchState>()(
   devtools(
@@ -19,27 +54,64 @@ export const useSearchStore = create<SearchState>()(
       // UI State
       isLoading: false,
       error: null,
-      sortBy: 'rating',
+      sortBy: getDefaultSortByForUserType(defaultFilters.userType),
       sortOrder: 'desc',
       view: 'grid',
 
       // Actions
       setFilters: (newFilters: Partial<SearchFilters>) => {
         set(
-          (state) => ({
-            filters: { ...state.filters, ...newFilters },
-          }),
+          (state) => {
+            const previousUserType = state.filters.userType;
+            let nextFilters: SearchFilters = { ...state.filters, ...newFilters };
+
+            if (nextFilters.userType === 'client') {
+              nextFilters = clearMusicianOnlyFilters(nextFilters);
+            }
+
+            const userTypeChanged =
+              typeof newFilters.userType === 'string' &&
+              newFilters.userType !== previousUserType;
+
+            const nextSortBy = userTypeChanged
+              ? normalizeSortBy(state.sortBy, nextFilters.userType)
+              : state.sortBy;
+
+            return {
+              filters: nextFilters,
+              sortBy: nextSortBy,
+              pagination: userTypeChanged
+                ? state.pagination
+                  ? { ...state.pagination, page: 1 }
+                  : { ...DEFAULT_PAGINATION }
+                : state.pagination,
+            };
+          },
           false,
           'search/setFilters'
         );
       },
 
       clearFilters: () => {
-        set({ filters: { ...defaultFilters } }, false, 'search/clearFilters');
+        set(
+          {
+            filters: { ...defaultFilters },
+            sortBy: getDefaultSortByForUserType(defaultFilters.userType),
+            pagination: { ...DEFAULT_PAGINATION },
+          },
+          false,
+          'search/clearFilters'
+        );
       },
 
-      setSortBy: (sortBy: string) => {
-        set({ sortBy }, false, 'search/setSortBy');
+      setSortBy: (sortBy: SearchSortBy) => {
+        set(
+          (state) => ({
+            sortBy: normalizeSortBy(sortBy, state.filters.userType),
+          }),
+          false,
+          'search/setSortBy'
+        );
       },
 
       setSortOrder: (sortOrder: 'asc' | 'desc') => {
@@ -55,7 +127,7 @@ export const useSearchStore = create<SearchState>()(
           (state) => ({
             pagination: state.pagination
               ? { ...state.pagination, page }
-              : { page, limit: 12, total: 0, totalPages: 1, hasMore: false },
+              : { ...DEFAULT_PAGINATION, page },
           }),
           false,
           'search/setPage'
@@ -76,35 +148,59 @@ export const useSearchStore = create<SearchState>()(
         try {
           // Converte filtros do frontend para parâmetros da API
           const params: SearchMusiciansParams = {
+            userType: filters.userType,
             page: pagination?.page || 1,
             limit: 12,
             sortOrder,
           };
 
+          const effectiveSortBy = normalizeSortBy(sortBy, filters.userType);
+          if (effectiveSortBy !== sortBy) {
+            set({ sortBy: effectiveSortBy }, false, 'search/normalizeSortBy');
+          }
+
           // Mapeia sortBy do frontend para o backend
-          if (sortBy === 'rating') params.sortBy = 'rating';
-          else if (sortBy === 'price-low') {
+          if (effectiveSortBy === 'rating') params.sortBy = 'rating';
+          else if (effectiveSortBy === 'price-low') {
             params.sortBy = 'priceFrom';
             params.sortOrder = 'asc';
-          } else if (sortBy === 'price-high') {
+          } else if (effectiveSortBy === 'price-high') {
             params.sortBy = 'priceFrom';
             params.sortOrder = 'desc';
-          } else if (sortBy === 'newest') params.sortBy = 'createdAt';
+          } else if (effectiveSortBy === 'newest') {
+            params.sortBy = 'createdAt';
+            params.sortOrder = 'desc';
+          } else if (effectiveSortBy === 'verified') {
+            params.sortBy = 'verified';
+            params.sortOrder = 'desc';
+          }
 
           // Filtros de localização
           if (filters.city) params.city = filters.city;
           if (filters.state && filters.state !== 'all') params.state = filters.state;
 
+          const canUseMusicianOnlyFilters = filters.userType !== 'client';
+
           // Filtros de gêneros e instrumentos (usa slugs)
-          if (filters.genres.length > 0) params.genres = filters.genres;
-          if (filters.instruments.length > 0) params.instruments = filters.instruments;
+          if (canUseMusicianOnlyFilters && filters.genres.length > 0) {
+            params.genres = filters.genres;
+          }
+          if (canUseMusicianOnlyFilters && filters.instruments.length > 0) {
+            params.instruments = filters.instruments;
+          }
 
           // Filtros de preço
-          if (filters.priceMin) params.priceMin = parseInt(filters.priceMin, 10);
-          if (filters.priceMax) params.priceMax = parseInt(filters.priceMax, 10);
+          if (canUseMusicianOnlyFilters && filters.priceMin) {
+            params.priceMin = parseInt(filters.priceMin, 10);
+          }
+          if (canUseMusicianOnlyFilters && filters.priceMax) {
+            params.priceMax = parseInt(filters.priceMax, 10);
+          }
 
           // Filtro de rating
-          if (filters.rating) params.rating = parseInt(filters.rating, 10);
+          if (canUseMusicianOnlyFilters && filters.rating) {
+            params.rating = parseInt(filters.rating, 10);
+          }
 
           // Busca textual
           if (filters.search) params.search = filters.search;
@@ -131,7 +227,7 @@ export const useSearchStore = create<SearchState>()(
             return;
           }
 
-          const message = error instanceof Error ? error.message : 'Erro ao buscar músicos';
+          const message = error instanceof Error ? error.message : 'Erro ao buscar resultados';
           set({ error: message, isLoading: false, musicians: [] }, false, 'search/searchError');
         } finally {
           if (requestId === activeSearchRequestId) {

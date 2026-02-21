@@ -11,7 +11,7 @@ import type { Conversation } from "@/api/chat";
 import { fetchMusicianById } from "@/api/musician";
 
 export interface PendingMusician {
-  id: number;
+  id?: number;
   userId: number;
   name: string;
   profileImageUrl?: string | null;
@@ -53,10 +53,13 @@ function MensagensContent() {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   // Evitar re-processar o mesmo param
-  const processedMusicoRef = useRef<string | null>(null);
+  const processedConversationRef = useRef<string | null>(null);
   
-  // Trata o query param ?musico=X
+  // Trata query params ?musico=X e ?usuario=Y
   const musicoParam = searchParams.get("musico");
+  const usuarioParam = searchParams.get("usuario");
+  const nomeParam = searchParams.get("nome");
+  const fotoParam = searchParams.get("foto");
 
   useEffect(() => {
     setHasHydrated(true);
@@ -69,47 +72,81 @@ function MensagensContent() {
   }, [hasHydrated, isLoggedIn, router]);
 
   useEffect(() => {
-    if (!musicoParam || !isLoggedIn || !hasHydrated) return;
-    if (processedMusicoRef.current === musicoParam) return;
+    if ((!musicoParam && !usuarioParam) || !isLoggedIn || !hasHydrated) return;
 
-    const musicianId = Number(musicoParam);
-    if (isNaN(musicianId) || musicianId <= 0) return;
+    const queryKey = musicoParam
+      ? `musico:${musicoParam}`
+      : usuarioParam
+        ? `usuario:${usuarioParam}`
+        : null;
 
-    processedMusicoRef.current = musicoParam;
+    if (!queryKey || processedConversationRef.current === queryKey) return;
 
-    // Busca os dados do músico para mapear musicianProfileId -> userId
-    setLoadingMusician(true);
-    fetchMusicianById(musicianId)
-      .then((musician) => {
-        const recipientUserId = musician.userId ?? musician.id;
-        const existing = conversations.find(
-          (c) =>
-            c.otherParty?.id === recipientUserId ||
-            c.musicianProfileId === musician.id
-        );
+    const openPendingConversation = (pending: PendingMusician) => {
+      const existing = conversations.find(
+        (c) =>
+          c.otherParty?.id === pending.userId ||
+          (pending.id ? c.musicianProfileId === pending.id : false)
+      );
 
-        if (existing) {
-          selectConversation(existing.id);
-          setShowChat(true);
-          setPendingMusician(null);
-          router.replace("/mensagens", { scroll: false });
-          return;
-        }
-
-        setPendingMusician({
-          id: musician.id,
-          userId: recipientUserId,
-          name: musician.name,
-          profileImageUrl: musician.profileImageUrl,
-        });
+      if (existing) {
+        selectConversation(existing.id);
         setShowChat(true);
-      })
-      .catch((err) => {
-        console.error("[Mensagens] Erro ao buscar músico:", err);
         setPendingMusician(null);
-      })
-      .finally(() => setLoadingMusician(false));
-  }, [musicoParam, isLoggedIn, hasHydrated, conversations, selectConversation, router]);
+        router.replace("/mensagens", { scroll: false });
+        return;
+      }
+
+      setPendingMusician(pending);
+      setShowChat(true);
+    };
+
+    if (musicoParam) {
+      const musicianId = Number(musicoParam);
+      if (isNaN(musicianId) || musicianId <= 0) return;
+
+      processedConversationRef.current = queryKey;
+      setLoadingMusician(true);
+
+      // Busca os dados do músico para mapear musicianProfileId -> userId
+      fetchMusicianById(musicianId)
+        .then((musician) => {
+          openPendingConversation({
+            id: musician.id,
+            userId: musician.userId ?? musician.id,
+            name: musician.name,
+            profileImageUrl: musician.profileImageUrl,
+          });
+        })
+        .catch((err) => {
+          console.error("[Mensagens] Erro ao buscar músico:", err);
+          setPendingMusician(null);
+        })
+        .finally(() => setLoadingMusician(false));
+
+      return;
+    }
+
+    const recipientUserId = Number(usuarioParam);
+    if (isNaN(recipientUserId) || recipientUserId <= 0) return;
+
+    processedConversationRef.current = queryKey;
+    openPendingConversation({
+      userId: recipientUserId,
+      name: nomeParam?.trim() || "Usuário",
+      profileImageUrl: fotoParam || undefined,
+    });
+  }, [
+    musicoParam,
+    usuarioParam,
+    nomeParam,
+    fotoParam,
+    isLoggedIn,
+    hasHydrated,
+    conversations,
+    selectConversation,
+    router,
+  ]);
 
   // Conversa selecionada
   const selectedConversation: Conversation | null =
@@ -130,7 +167,7 @@ function MensagensContent() {
     setShowChat(false);
     selectConversation(null);
     setPendingMusician(null);
-    processedMusicoRef.current = null;
+    processedConversationRef.current = null;
     router.replace("/mensagens", { scroll: false });
   }, [selectConversation, router]);
 
@@ -138,7 +175,7 @@ function MensagensContent() {
   const handleConversationCreated = useCallback(
     (conversationId: number) => {
       setPendingMusician(null);
-      processedMusicoRef.current = null;
+      processedConversationRef.current = null;
       selectConversation(conversationId);
       router.replace("/mensagens", { scroll: false });
     },
