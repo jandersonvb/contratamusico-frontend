@@ -59,6 +59,20 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface PublicClientProfile {
+  id: number;
+  userType: UserType.CLIENT;
+  badgeLabel: "Contratante";
+  name: string;
+  profileImageUrl?: string;
+  city: string | null;
+  state: string | null;
+  location: string | null;
+  bookingsCount: number;
+  reviewsGivenCount: number;
+  createdAt: string;
+}
+
 export interface UserState {
   user: User | null;
   isLoading: boolean;

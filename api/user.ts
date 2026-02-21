@@ -1,4 +1,4 @@
-import { User, UpdateUserData } from "@/lib/types/user";
+import { PublicClientProfile, UpdateUserData, User } from "@/lib/types/user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -102,6 +102,35 @@ export async function uploadAvatar(file: File): Promise<User> {
     }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao fazer upload da imagem');
+  }
+
+  return response.json();
+}
+
+/**
+ * Busca perfil público de um contratante por ID
+ * GET /users/clients/:id
+ */
+export async function fetchPublicClientById(id: number): Promise<PublicClientProfile> {
+  if (!id || Number.isNaN(id) || id <= 0) {
+    throw new Error("ID do contratante inválido");
+  }
+
+  const response = await fetch(`${API_URL}/users/clients/${id}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Contratante não encontrado");
+    }
+
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Falha ao buscar perfil do contratante");
   }
 
   return response.json();

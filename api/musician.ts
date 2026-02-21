@@ -1,5 +1,5 @@
-import { MusicianListItem, MusicianProfile, PaginatedMusiciansResponse } from '@/lib/types/musician';
-import { SearchMusiciansParams } from '@/lib/types/search';
+import { MusicianListItem, MusicianProfile } from '@/lib/types/musician';
+import { PaginatedSearchResponse, SearchMusiciansParams, SearchResultItem } from '@/lib/types/search';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -8,6 +8,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
  */
 function buildQueryString(params: SearchMusiciansParams): string {
   const searchParams = new URLSearchParams();
+
+  if (params.userType) searchParams.set('userType', params.userType);
 
   // Arrays (genres, instruments) - adiciona múltiplos valores
   if (params.genres?.length) {
@@ -36,13 +38,114 @@ function buildQueryString(params: SearchMusiciansParams): string {
   return searchParams.toString();
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toNullableString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toBoolean(value: unknown): boolean {
+  return Boolean(value);
+}
+
+function normalizeTaxonomyItems(raw: unknown): Array<{ id: number; name: string; slug: string }> {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => {
+      const data = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+      const name = toNullableString(data.name);
+      const slug = toNullableString(data.slug);
+
+      if (!name || !slug) {
+        return null;
+      }
+
+      return {
+        id: toNumber(data.id),
+        name,
+        slug,
+      };
+    })
+    .filter((item): item is { id: number; name: string; slug: string } => item !== null);
+}
+
+function normalizeStringArray(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+
+  const values = raw
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+
+  return values.length > 0 ? values : undefined;
+}
+
+function normalizeSearchItem(raw: unknown): SearchResultItem {
+  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const userType = data.userType === 'CLIENT' ? 'CLIENT' : 'MUSICIAN';
+
+  return {
+    id: toNumber(data.id),
+    userId: toNumber(data.userId),
+    userType,
+    badgeLabel:
+      data.badgeLabel === 'Contratante' || userType === 'CLIENT'
+        ? 'Contratante'
+        : 'Músico',
+    name: toNullableString(data.name) || 'Usuário',
+    profileImageUrl: toNullableString(data.profileImageUrl),
+    photos: normalizeStringArray(data.photos),
+    category: toNullableString(data.category),
+    location: toNullableString(data.location),
+    priceFrom: toNullableNumber(data.priceFrom),
+    rating: toNullableNumber(data.rating),
+    ratingCount: toNumber(data.ratingCount),
+    eventsCount: toNumber(data.eventsCount),
+    isFeatured: toBoolean(data.isFeatured),
+    isVerified: toBoolean(data.isVerified),
+    genres: normalizeTaxonomyItems(data.genres),
+    instruments: normalizeTaxonomyItems(data.instruments),
+    createdAt: toNullableString(data.createdAt) || new Date().toISOString(),
+  };
+}
+
+function normalizePaginatedSearchResponse(raw: unknown): PaginatedSearchResponse {
+  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const paginationRaw =
+    data.pagination && typeof data.pagination === 'object'
+      ? (data.pagination as Record<string, unknown>)
+      : {};
+
+  return {
+    data: Array.isArray(data.data) ? data.data.map(normalizeSearchItem) : [],
+    pagination: {
+      page: Math.max(1, toNumber(paginationRaw.page, 1)),
+      limit: Math.max(1, toNumber(paginationRaw.limit, 12)),
+      total: Math.max(0, toNumber(paginationRaw.total, 0)),
+      totalPages: Math.max(1, toNumber(paginationRaw.totalPages, 1)),
+      hasMore: toBoolean(paginationRaw.hasMore),
+    },
+  };
+}
+
 /**
  * Busca músicos com filtros e paginação
  */
 export async function searchMusicians(
   params: SearchMusiciansParams = {},
   options?: { signal?: AbortSignal }
-): Promise<PaginatedMusiciansResponse> {
+): Promise<PaginatedSearchResponse> {
   const queryString = buildQueryString(params);
   const url = `${API_URL}/musicians${queryString ? `?${queryString}` : ''}`;
 
@@ -57,10 +160,11 @@ export async function searchMusicians(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || 'Falha ao buscar músicos');
+    throw new Error(errorData?.message || 'Falha ao buscar resultados');
   }
 
-  return response.json();
+  const payload = await response.json();
+  return normalizePaginatedSearchResponse(payload);
 }
 
 /**

@@ -1,11 +1,24 @@
-import { SearchFilters, defaultFilters } from "@/lib/types/search";
+import {
+  SearchFilters,
+  SearchSortBy,
+  SearchUserTypeFilter,
+  defaultFilters,
+  getDefaultSortByForUserType,
+  isSortAllowedForUserType,
+} from "@/lib/types/search";
 
 type SearchParamsLike = {
   get: (name: string) => string | null;
   getAll: (name: string) => string[];
 };
 
-const ALLOWED_SORT_VALUES = new Set(["rating", "price-low", "price-high", "newest"]);
+const ALLOWED_SORT_VALUES = new Set<SearchSortBy>([
+  "rating",
+  "price-low",
+  "price-high",
+  "newest",
+  "verified",
+]);
 
 function parseArray(params: SearchParamsLike, key: string): string[] {
   const raw = params.getAll(key);
@@ -27,9 +40,15 @@ function parsePositiveInt(value: string | null, fallback: number): number {
 
 export function parseSearchStateFromUrl(params: SearchParamsLike): {
   filters: SearchFilters;
-  sortBy: string;
+  sortBy: SearchSortBy;
   page: number;
 } {
+  const userTypeCandidate = params.get("userType");
+  const userType: SearchUserTypeFilter =
+    userTypeCandidate === "musician" || userTypeCandidate === "client" || userTypeCandidate === "all"
+      ? userTypeCandidate
+      : "all";
+
   const search = params.get("search") ?? params.get("q") ?? "";
   const city = params.get("city") ?? params.get("location") ?? "";
   const state = params.get("state") ?? "";
@@ -41,16 +60,22 @@ export function parseSearchStateFromUrl(params: SearchParamsLike): {
   const genres = parseArray(params, "genres");
   const availability = parseArray(params, "availability");
 
-  const sortByCandidate = params.get("sortBy") ?? "rating";
-  const sortBy = ALLOWED_SORT_VALUES.has(sortByCandidate)
-    ? sortByCandidate
-    : "rating";
+  const fallbackSortBy = getDefaultSortByForUserType(userType);
+  const sortByCandidate = params.get("sortBy");
+  const parsedSortBy =
+    sortByCandidate && ALLOWED_SORT_VALUES.has(sortByCandidate as SearchSortBy)
+      ? (sortByCandidate as SearchSortBy)
+      : fallbackSortBy;
+  const sortBy = isSortAllowedForUserType(parsedSortBy, userType)
+    ? parsedSortBy
+    : fallbackSortBy;
 
   const page = parsePositiveInt(params.get("page"), 1);
 
   return {
     filters: {
       ...defaultFilters,
+      userType,
       search,
       city,
       state,
@@ -67,8 +92,14 @@ export function parseSearchStateFromUrl(params: SearchParamsLike): {
   };
 }
 
-export function buildSearchUrlQuery(filters: SearchFilters, sortBy: string, page: number): string {
+export function buildSearchUrlQuery(
+  filters: SearchFilters,
+  sortBy: SearchSortBy,
+  page: number,
+): string {
   const params = new URLSearchParams();
+
+  params.set("userType", filters.userType);
 
   if (filters.search) params.set("search", filters.search);
   if (filters.city) params.set("city", filters.city);
@@ -82,9 +113,9 @@ export function buildSearchUrlQuery(filters: SearchFilters, sortBy: string, page
   filters.genres.forEach((genre) => params.append("genres", genre));
   filters.availability.forEach((slot) => params.append("availability", slot));
 
-  if (sortBy && sortBy !== "rating") params.set("sortBy", sortBy);
+  const defaultSortBy = getDefaultSortByForUserType(filters.userType);
+  if (sortBy && sortBy !== defaultSortBy) params.set("sortBy", sortBy);
   if (page > 1) params.set("page", String(page));
 
   return params.toString();
 }
-

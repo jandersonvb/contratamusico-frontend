@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { MusicianListItem } from "@/lib/types/musician";
+import type { SearchResultItem } from "@/lib/types/search";
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,7 +23,7 @@ import { useUserStore } from "@/lib/stores/userStore";
 import { toast } from "sonner";
 
 interface MusicianCardProps {
-  musician: MusicianListItem;
+  musician: SearchResultItem;
   view?: "grid" | "list";
 }
 
@@ -45,10 +45,38 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const isMusician = musician.userType === "MUSICIAN";
+  const safeLocation = musician.location || "Local não informado";
+  const hasRating = musician.rating !== null && musician.rating !== undefined;
+  const hasPrice = musician.priceFrom !== null && musician.priceFrom !== undefined;
+  const categoryLabel = musician.category || musician.badgeLabel || (isMusician ? "Músico" : "Contratante");
+  const clientId = musician.userId || musician.id;
+  const clientMessageHref = (() => {
+    const params = new URLSearchParams({
+      usuario: String(clientId),
+      nome: musician.name,
+    });
+
+    if (musician.profileImageUrl) {
+      params.set("foto", musician.profileImageUrl);
+    }
+
+    return `/mensagens?${params.toString()}`;
+  })();
+  const cardHref = (() => {
+    if (isMusician) {
+      return `/musico/${musician.id}`;
+    }
+    return `/cliente/${clientId}`;
+  })();
 
   const { isLoggedIn } = useUserStore();
-  const favorite = useFavoriteStore((s) => s.favoriteIds.has(musician.id));
-  const isTogglingFav = useFavoriteStore((s) => s.togglingIds.has(musician.id));
+  const favorite = useFavoriteStore((s) =>
+    musician.userType === "MUSICIAN" ? s.favoriteIds.has(musician.id) : false
+  );
+  const isTogglingFav = useFavoriteStore((s) =>
+    musician.userType === "MUSICIAN" ? s.togglingIds.has(musician.id) : false
+  );
 
   const photos = (() => {
     const list: string[] = [];
@@ -80,6 +108,7 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   ) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isMusician) return;
 
     if (!isLoggedIn) {
       toast.error("Você precisa estar logado para favoritar");
@@ -131,7 +160,13 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   const handleChatClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/mensagens?musico=${musician.id}`);
+
+    if (isMusician) {
+      router.push(`/mensagens?musico=${musician.id}`);
+      return;
+    }
+
+    router.push(clientMessageHref);
   };
 
   const currentPhotoUrl = imageErrors.has(currentPhotoIndex)
@@ -196,36 +231,38 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         </>
       )}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-3 right-3 h-9 w-9 rounded-full bg-background/80 hover:bg-background transition-all duration-200 hover:scale-110 active:scale-95 z-20"
-        aria-label={
-          favorite
-            ? `Remover ${musician.name} dos favoritos`
-            : `Adicionar ${musician.name} aos favoritos`
-        }
-        onClick={(e) => handleToggleFavorite(e, musician.id)}
-        disabled={isTogglingFav}
-      >
-        {isTogglingFav ? (
-          <Loader2
-            className="h-4 w-4 animate-spin text-muted-foreground"
-            aria-hidden="true"
-          />
-        ) : (
-          <Heart
-            className={`h-4 w-4 transition-colors ${
-              favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"
-            }`}
-            aria-hidden="true"
-          />
-        )}
-      </Button>
+      {isMusician && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-3 right-3 h-9 w-9 rounded-full bg-background/80 hover:bg-background transition-all duration-200 hover:scale-110 active:scale-95 z-20"
+          aria-label={
+            favorite
+              ? `Remover ${musician.name} dos favoritos`
+              : `Adicionar ${musician.name} aos favoritos`
+          }
+          onClick={(e) => handleToggleFavorite(e, musician.id)}
+          disabled={isTogglingFav}
+        >
+          {isTogglingFav ? (
+            <Loader2
+              className="h-4 w-4 animate-spin text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : (
+            <Heart
+              className={`h-4 w-4 transition-colors ${
+                favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"
+              }`}
+              aria-hidden="true"
+            />
+          )}
+        </Button>
+      )}
 
       <div className="absolute left-3 right-3 bottom-3 flex items-center justify-between gap-2 z-20">
         <Badge className="bg-white/90 text-black hover:bg-white max-w-[70%] truncate">
-          {musician.category || "Músico"}
+          {categoryLabel}
         </Badge>
         {musician.isFeatured && (
           <Badge className="text-[10px] bg-warning text-warning-foreground shrink-0">
@@ -237,18 +274,18 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   );
 
   if (view === "list") {
-    return (
-      <Link href={`/musico/${musician.id}`} className="block group">
-        <Card className="border p-3 sm:p-4 transition-all duration-300 hover:shadow-md">
-          <div className="flex flex-col min-[360px]:flex-row gap-3 sm:gap-4">
-            <div className="relative h-36 w-full min-[360px]:h-20 min-[360px]:w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-              <Image
-                src={currentPhotoUrl}
-                alt={`Foto de ${musician.name}`}
-                fill
-                className="object-cover"
-                unoptimized
-              />
+    const listCard = (
+      <Card className="border p-3 sm:p-4 transition-all duration-300 hover:shadow-md">
+        <div className="flex flex-col min-[360px]:flex-row gap-3 sm:gap-4">
+          <div className="relative h-36 w-full min-[360px]:h-20 min-[360px]:w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+            <Image
+              src={currentPhotoUrl}
+              alt={`Foto de ${musician.name}`}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+            {isMusician && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -269,139 +306,147 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
                   />
                 )}
               </Button>
-            </div>
+            )}
+          </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-base line-clamp-1">{musician.name}</h3>
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                    <MapPin className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                    <span className="line-clamp-1">{musician.location}</span>
-                  </p>
-                </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-base line-clamp-1">{musician.name}</h3>
+                <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                  <MapPin className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{safeLocation}</span>
+                </p>
+              </div>
+              {hasRating && (
                 <Badge variant="outline" className="shrink-0 text-[11px] border-warning/40 text-warning">
                   <Star className="h-3 w-3 mr-1 fill-warning text-warning" />
-                  {musician.rating.toFixed(1)}
+                  {musician.rating!.toFixed(1)}
                 </Badge>
-              </div>
+              )}
+            </div>
 
-              <div className="mt-2 flex flex-wrap gap-1">
-                {genreTags.slice(0, 2).map((genre) => (
-                  <Badge key={genre.id} variant="secondary" className="text-[10px] font-medium">
-                    {genre.name}
-                  </Badge>
-                ))}
-                {musician.category && (
-                  <Badge variant="outline" className="text-[10px] font-medium">
-                    {musician.category}
-                  </Badge>
-                )}
-              </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {genreTags.slice(0, 2).map((genre) => (
+                <Badge key={genre.id} variant="secondary" className="text-[10px] font-medium">
+                  {genre.name}
+                </Badge>
+              ))}
+              <Badge variant="outline" className="text-[10px] font-medium">
+                {categoryLabel}
+              </Badge>
+            </div>
 
-              <div className="mt-2 flex items-center justify-between gap-2">
-                {musician.priceFrom ? (
-                  <span className="text-sm font-semibold text-primary">
-                    R$ {musician.priceFrom.toLocaleString("pt-BR")}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Consultar preço</span>
-                )}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {hasPrice ? (
+                <span className="text-sm font-semibold text-primary">
+                  R$ {musician.priceFrom!.toLocaleString("pt-BR")}
+                </span>
+              ) : null}
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 sm:px-3"
-                  onClick={handleChatClick}
-                  aria-label={`Enviar mensagem para ${musician.name}`}
-                >
-                  <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
-                  <span className="hidden min-[360px]:inline">Mensagem</span>
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 sm:px-3"
+                onClick={handleChatClick}
+                aria-label={`Enviar mensagem para ${musician.name}`}
+              >
+                <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
+                <span className="hidden min-[360px]:inline">Mensagem</span>
+              </Button>
             </div>
           </div>
-        </Card>
+        </div>
+      </Card>
+    );
+
+    return (
+      <Link href={cardHref} className="block group">
+        {listCard}
       </Link>
     );
   }
 
-  return (
-    <Link href={`/musico/${musician.id}`} className="block group">
-      <Card className="flex flex-col overflow-hidden border transition-all duration-300 hover:shadow-lg group-hover:-translate-y-1">
-        <ImageCarousel className="w-full h-52" />
+  const gridCard = (
+    <Card className="flex flex-col overflow-hidden border transition-all duration-300 hover:shadow-lg group-hover:-translate-y-1">
+      <ImageCarousel className="w-full h-52" />
 
-        <div className="p-4 sm:p-5 flex flex-col flex-1">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <h3 className="font-semibold text-lg leading-tight line-clamp-2 flex-1">
-              {musician.name}
-            </h3>
+      <div className="p-4 sm:p-5 flex flex-col flex-1">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h3 className="font-semibold text-lg leading-tight line-clamp-2 flex-1">
+            {musician.name}
+          </h3>
+          {hasRating && (
             <Badge
               variant="outline"
               className="shrink-0 font-semibold border-warning/40 text-warning"
             >
               <Star className="h-3.5 w-3.5 mr-1 fill-warning text-warning" />
-              {musician.rating.toFixed(1)}
+              {musician.rating!.toFixed(1)}
             </Badge>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3">
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            <span className="line-clamp-1">{musician.location}</span>
-            {musician.ratingCount > 0 && (
-              <span className="text-xs">· {musician.ratingCount}</span>
-            )}
-          </div>
-
-          {genreTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {genreTags.map((genre) => (
-                <Badge key={genre.id} variant="secondary" className="text-[11px] font-medium">
-                  {genre.name}
-                </Badge>
-              ))}
-              {musician.genres.length > 3 && (
-                <Badge variant="outline" className="text-[11px] font-medium">
-                  +{musician.genres.length - 3}
-                </Badge>
-              )}
-            </div>
           )}
-
-          {instrumentsLabel && (
-            <div className="flex items-start gap-1.5 text-sm text-muted-foreground mb-4">
-              <Music2 className="h-4 w-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
-              <span className="line-clamp-2">{instrumentsLabel}</span>
-            </div>
-          )}
-
-          <div className="mt-auto border-t pt-3 flex items-center justify-between gap-3">
-            {musician.priceFrom ? (
-              <div>
-                <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
-                  A partir de
-                </span>
-                <span className="text-base font-bold text-primary">
-                  R$ {musician.priceFrom.toLocaleString("pt-BR")}
-                </span>
-              </div>
-            ) : (
-              <span className="text-sm text-muted-foreground">Consultar preço</span>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 px-3"
-              onClick={handleChatClick}
-              aria-label={`Enviar mensagem para ${musician.name}`}
-            >
-              <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
-              <span className="hidden min-[360px]:inline">Mensagem</span>
-            </Button>
-          </div>
         </div>
-      </Card>
+
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3">
+          <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+          <span className="line-clamp-1">{safeLocation}</span>
+          {hasRating && musician.ratingCount > 0 && (
+            <span className="text-xs">· {musician.ratingCount}</span>
+          )}
+        </div>
+
+        {genreTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {genreTags.map((genre) => (
+              <Badge key={genre.id} variant="secondary" className="text-[11px] font-medium">
+                {genre.name}
+              </Badge>
+            ))}
+            {musician.genres.length > 3 && (
+              <Badge variant="outline" className="text-[11px] font-medium">
+                +{musician.genres.length - 3}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {instrumentsLabel && (
+          <div className="flex items-start gap-1.5 text-sm text-muted-foreground mb-4">
+            <Music2 className="h-4 w-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <span className="line-clamp-2">{instrumentsLabel}</span>
+          </div>
+        )}
+
+        <div className="mt-auto border-t pt-3 flex items-center justify-between gap-3">
+          {hasPrice ? (
+            <div>
+              <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
+                A partir de
+              </span>
+              <span className="text-base font-bold text-primary">
+                R$ {musician.priceFrom!.toLocaleString("pt-BR")}
+              </span>
+            </div>
+          ) : null}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 px-3"
+            onClick={handleChatClick}
+            aria-label={`Enviar mensagem para ${musician.name}`}
+          >
+            <MessageCircle className="h-4 w-4 min-[360px]:mr-1.5" />
+            <span className="hidden min-[360px]:inline">Mensagem</span>
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+
+  return (
+    <Link href={cardHref} className="block group">
+      {gridCard}
     </Link>
   );
 }

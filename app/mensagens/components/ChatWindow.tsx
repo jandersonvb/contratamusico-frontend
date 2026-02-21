@@ -212,7 +212,7 @@ export function ChatWindow({
 
         const result = await sendMessage({
           recipientUserId: pendingMusician.userId,
-          musicianProfileId: pendingMusician.id,
+          ...(pendingMusician.id ? { musicianProfileId: pendingMusician.id } : {}),
           content,
         });
 
@@ -227,7 +227,7 @@ export function ChatWindow({
         const newConversation = convs.find(
           (c) =>
             c.otherParty?.id === pendingMusician.userId ||
-            c.musicianProfileId === pendingMusician.id
+            (pendingMusician.id ? c.musicianProfileId === pendingMusician.id : false)
         );
 
         if (newConversation) {
@@ -285,7 +285,7 @@ export function ChatWindow({
             "message:send",
             {
               recipientUserId: pendingMusician.userId,
-              musicianProfileId: pendingMusician.id,
+              ...(pendingMusician.id ? { musicianProfileId: pendingMusician.id } : {}),
               content,
             },
             async (response: unknown) => {
@@ -351,7 +351,7 @@ export function ChatWindow({
           file,
           content: caption,
           recipientUserId: pendingMusician.userId,
-          musicianProfileId: pendingMusician.id,
+          ...(pendingMusician.id ? { musicianProfileId: pendingMusician.id } : {}),
         });
 
         const convs = await getMyConversations();
@@ -365,7 +365,7 @@ export function ChatWindow({
         const newConversation = convs.find(
           (c) =>
             c.otherParty?.id === pendingMusician.userId ||
-            c.musicianProfileId === pendingMusician.id
+            (pendingMusician.id ? c.musicianProfileId === pendingMusician.id : false)
         );
 
         if (newConversation) {
