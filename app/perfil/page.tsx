@@ -68,6 +68,20 @@ const PROFILE_TABS: ProfileTab[] = [
   "configuracoes",
 ];
 
+const CLIENT_PROFILE_TABS: ProfileTab[] = [
+  "info-pessoais",
+  "configuracoes",
+];
+
+const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
+  "info-pessoais": "Informações Pessoais",
+  "info-musicais": "Informações Musicais",
+  portfolio: "Portfólio",
+  avaliacoes: "Avaliações",
+  assinatura: "Assinatura",
+  configuracoes: "Configurações",
+};
+
 /**
  * Profile page that allows the logged in musician to view and edit their
  * personal and musical information. It also shows a summary card with
@@ -101,6 +115,13 @@ export default function PerfilPage() {
 
   // Tabs state
   const [activeTab, setActiveTab] = useState<ProfileTab>("info-pessoais");
+  const availableTabs = useMemo<ProfileTab[]>(() => {
+    if (!user) {
+      return PROFILE_TABS;
+    }
+
+    return isMusician ? PROFILE_TABS : CLIENT_PROFILE_TABS;
+  }, [isMusician, user]);
 
   // Subscription state
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionResponse | null>(null);
@@ -206,7 +227,7 @@ export default function PerfilPage() {
   useEffect(() => {
     const syncTabFromUrl = () => {
       const tabParam = new URLSearchParams(window.location.search).get("tab");
-      if (tabParam && PROFILE_TABS.includes(tabParam as ProfileTab)) {
+      if (tabParam && availableTabs.includes(tabParam as ProfileTab)) {
         setActiveTab(tabParam as ProfileTab);
       }
     };
@@ -214,9 +235,23 @@ export default function PerfilPage() {
     syncTabFromUrl();
     window.addEventListener("popstate", syncTabFromUrl);
     return () => window.removeEventListener("popstate", syncTabFromUrl);
-  }, []);
+  }, [availableTabs]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (availableTabs.includes(activeTab)) return;
+
+    const fallbackTab = availableTabs[0] ?? "info-pessoais";
+    setActiveTab(fallbackTab);
+    router.replace(`/perfil?tab=${fallbackTab}`, { scroll: false });
+  }, [activeTab, availableTabs, router, user]);
 
   const fetchSubscriptionData = useCallback(async () => {
+    if (!isMusician) {
+      setSubscriptionData({ hasSubscription: false });
+      return;
+    }
+
     setIsLoadingSubscription(true);
     try {
       const data = await getMySubscription();
@@ -227,14 +262,14 @@ export default function PerfilPage() {
     } finally {
       setIsLoadingSubscription(false);
     }
-  }, []);
+  }, [isMusician]);
 
   // Buscar dados de assinatura quando acessar a aba
   useEffect(() => {
-    if (activeTab === "assinatura" && isLoggedIn && !subscriptionData) {
+    if (activeTab === "assinatura" && isLoggedIn && isMusician && !subscriptionData) {
       fetchSubscriptionData();
     }
-  }, [activeTab, isLoggedIn, subscriptionData, fetchSubscriptionData]);
+  }, [activeTab, isLoggedIn, isMusician, subscriptionData, fetchSubscriptionData]);
 
   // Buscar portfólio e assinatura quando acessar a aba de portfólio
   useEffect(() => {
@@ -481,6 +516,10 @@ export default function PerfilPage() {
   };
 
   const handleTabChange = (tab: ProfileTab) => {
+    if (!availableTabs.includes(tab)) {
+      return;
+    }
+
     setActiveTab(tab);
     router.replace(`/perfil?tab=${tab}`, { scroll: false });
   };
@@ -715,23 +754,16 @@ export default function PerfilPage() {
             </div>
             {/* Navigation menu */}
             <nav className="flex flex-col space-y-2">
-              {[
-                { id: "info-pessoais", label: "Informações Pessoais" },
-                { id: "info-musicais", label: "Informações Musicais" },
-                { id: "portfolio", label: "Portfólio" },
-                { id: "avaliacoes", label: "Avaliações" },
-                { id: "assinatura", label: "Assinatura" },
-                { id: "configuracoes", label: "Configurações" },
-              ].map((item) => (
+              {availableTabs.map((tabId) => (
                 <button
-                  key={item.id}
-                  onClick={() => handleTabChange(item.id as ProfileTab)}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${activeTab === item.id
+                  key={tabId}
+                  onClick={() => handleTabChange(tabId)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${activeTab === tabId
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted"
                     }`}
                 >
-                  {item.label}
+                  {PROFILE_TAB_LABELS[tabId]}
                 </button>
               ))}
             </nav>

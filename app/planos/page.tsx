@@ -11,88 +11,99 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { clientPlans, planFaq, type Plan as LocalPlan } from "@/lib/plans";
+import { planFaq } from "@/lib/plans";
 import { Check, X, Star as StarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { getPlans, createCheckoutSession } from "@/api";
 import type { Plan } from "@/api/plan";
 import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/userStore";
+import { UserType } from "@/lib/types/user";
 import { useRouter } from "next/navigation";
 
-function mapLocalPlansToApiShape(
-  localPlans: LocalPlan[],
-  category: "musician" | "client",
-): Plan[] {
-  return localPlans.map((plan, planIndex) => ({
-    id: -(planIndex + 1),
-    title: plan.title,
-    description: plan.description,
-    monthlyPrice: Math.round(plan.monthly * 100),
-    yearlyPrice: Math.round(plan.yearly * 100),
-    badge: plan.badge ?? null,
-    features: plan.features.map((feature, featureIndex) => ({
-      id: featureIndex + 1,
-      planId: -(planIndex + 1),
-      text: feature.text,
-      available: feature.available,
-      highlight: Boolean(feature.highlight),
-    })),
-    maxPhotos: null,
-    maxVideos: null,
-    hasSpotlight: false,
-    hasWhatsapp: false,
-    hasStatistics: false,
-    isMusicianPlan: category === "musician",
-    isClientPlan: category === "client",
-    createdAt: "",
-  }));
+const STATS_FEATURE_REGEX = /estat[ií]stic/i;
+const WHATSAPP_FEATURE_REGEX = /whats ?app/i;
+const WHATSAPP_FEATURE_FALLBACK_TEXT = "Contato por mensagem e WhatsApp";
+
+function getVisiblePlanFeatures(plan: Plan): Plan["features"] {
+  const nonStatsFeatures = plan.features.filter(
+    (feature) => !STATS_FEATURE_REGEX.test(feature.text),
+  );
+
+  const whatsappFeature = nonStatsFeatures.find((feature) =>
+    WHATSAPP_FEATURE_REGEX.test(feature.text),
+  );
+
+  const featuresWithoutWhatsapp = nonStatsFeatures.filter(
+    (feature) => !WHATSAPP_FEATURE_REGEX.test(feature.text),
+  );
+
+  if (!plan.hasWhatsapp) {
+    return featuresWithoutWhatsapp;
+  }
+
+  if (whatsappFeature) {
+    return [...featuresWithoutWhatsapp, whatsappFeature];
+  }
+
+  const fallbackFeatureId = nonStatsFeatures.reduce(
+    (highestId, feature) => Math.max(highestId, feature.id),
+    0,
+  ) + 1;
+
+  return [
+    ...featuresWithoutWhatsapp,
+    {
+      id: fallbackFeatureId,
+      planId: plan.id,
+      text: WHATSAPP_FEATURE_FALLBACK_TEXT,
+      available: true,
+      highlight: false,
+    },
+  ];
 }
 
 export default function PlanosPage() {
   const router = useRouter();
-  const { isLoggedIn } = useUserStore();
-  const [category, setCategory] = useState<"musician" | "client">("musician");
+  const { isLoggedIn, user } = useUserStore();
   const [annual, setAnnual] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingPlanId, setProcessingPlanId] = useState<number | null>(null);
+  const isClientUser = user?.userType === UserType.CLIENT;
 
   const fetchPlans = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getPlans(category);
-      if (category === "client" && data.length === 0) {
-        setPlans(mapLocalPlansToApiShape(clientPlans, "client"));
-      } else {
-        setPlans(data);
-      }
+      const data = await getPlans("musician");
+      setPlans(data);
     } catch (error) {
-      if (category === "client") {
-        setPlans(mapLocalPlansToApiShape(clientPlans, "client"));
-      } else {
-        const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
-        toast.error(message);
-      }
+      const message = error instanceof Error ? error.message : "Erro ao carregar planos";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
-  }, [category]);
+  }, []);
 
   useEffect(() => {
     fetchPlans();
   }, [fetchPlans]);
 
   const handleSubscribe = async (plan: Plan) => {
-    if (plan.id < 0) {
-      toast.info("Checkout para contratantes em breve. Fale com vendas para ativar.");
-      router.push("/contato");
-      return;
-    }
-
     if (!isLoggedIn) {
       toast.error("Você precisa estar logado para assinar um plano");
       router.push("/login");
+      return;
+    }
+
+    if (!user) {
+      toast.info("Carregando sua sessão. Tente novamente em instantes.");
+      return;
+    }
+
+    if (user.userType === UserType.CLIENT) {
+      toast.info("Contratantes não precisam assinar plano.");
+      router.push("/dashboard");
       return;
     }
 
@@ -122,10 +133,9 @@ export default function PlanosPage() {
     <>
       <SEO
         title="Planos e Preços"
-        description="Confira nossos planos para músicos e contratantes. Opções gratuitas e premium com recursos exclusivos. Planos mensais e anuais com desconto. Escolha o melhor para você."
+        description="Confira os planos para músicos da plataforma. Opções gratuitas e premium com recursos exclusivos. Planos mensais e anuais com desconto."
         keywords={[
           "planos para músicos",
-          "planos para contratantes",
           "preços contrata músico",
           "assinatura músico",
           "plano premium",
@@ -140,27 +150,13 @@ export default function PlanosPage() {
             Escolha o Plano Ideal para Você
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-muted-foreground">
-            Oferecemos opções flexíveis para músicos e contratantes, com recursos
-            que se adaptam às suas necessidades
+            Planos para músicos com recursos que evoluem junto com sua presença na plataforma.
           </p>
-          <div className="flex justify-center gap-2 sm:gap-4 flex-wrap">
-            <Button
-              variant={category === "musician" ? "default" : "outline"}
-              onClick={() => setCategory("musician")}
-              size="sm"
-              className="text-xs sm:text-sm"
-            >
-              Para Músicos
-            </Button>
-            <Button
-              variant={category === "client" ? "default" : "outline"}
-              onClick={() => setCategory("client")}
-              size="sm"
-              className="text-xs sm:text-sm"
-            >
-              Para Contratantes
-            </Button>
-          </div>
+          {isClientUser && (
+            <p className="max-w-2xl mx-auto text-xs sm:text-sm text-muted-foreground">
+              Contratantes não precisam de assinatura. Use a plataforma normalmente para buscar e contratar músicos.
+            </p>
+          )}
           <div className="flex items-center justify-center gap-3 sm:gap-4 mt-4">
             <span className="text-xs sm:text-sm">Mensal</span>
             <Switch
@@ -193,9 +189,7 @@ export default function PlanosPage() {
                   : `R$ ${(price / 100).toFixed(2).replace('.', ',')}`;
                 const isProcessing = processingPlanId === plan.id;
                 const isFeatured = Boolean(plan.badge);
-                const visibleFeatures = plan.features.filter(
-                  (feature) => !/estat[ií]stic/i.test(feature.text),
-                );
+                const visibleFeatures = getVisiblePlanFeatures(plan);
                 return (
                   <div
                     key={plan.id}
@@ -264,6 +258,8 @@ export default function PlanosPage() {
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processando...
                         </>
+                      ) : isClientUser ? (
+                        "Disponível para músicos"
                       ) : plan.monthlyPrice === 0 ? (
                         "Começar Grátis"
                       ) : (

@@ -2,6 +2,8 @@ import { Plan } from './plan';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+const MUSICIAN_ONLY_MESSAGE = 'Apenas músicos podem gerenciar assinatura e pagamentos';
+
 export interface CreateCheckoutSessionData {
   planId: number;
   billingInterval: 'monthly' | 'yearly';
@@ -80,6 +82,9 @@ export async function createCheckoutSession(data: CreateCheckoutSessionData): Pr
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(MUSICIAN_ONLY_MESSAGE);
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao criar sessão de checkout');
   }
@@ -106,6 +111,9 @@ export async function getMySubscription(): Promise<SubscriptionResponse> {
   });
 
   if (!response.ok) {
+    if (response.status === 403 || response.status === 404) {
+      return { hasSubscription: false };
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao buscar assinatura');
   }
@@ -132,6 +140,17 @@ export async function getPaymentHistory(page: number = 1, limit: number = 10): P
   });
 
   if (!response.ok) {
+    if (response.status === 403 || response.status === 404) {
+      return {
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 1,
+        },
+      };
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao buscar histórico de pagamentos');
   }
@@ -158,6 +177,9 @@ export async function cancelSubscription(): Promise<CancelSubscriptionResponse> 
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(MUSICIAN_ONLY_MESSAGE);
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao cancelar assinatura');
   }
@@ -184,6 +206,9 @@ export async function reactivateSubscription(): Promise<ReactivateSubscriptionRe
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(MUSICIAN_ONLY_MESSAGE);
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao reativar assinatura');
   }
@@ -211,10 +236,12 @@ export async function createPortalSession(returnUrl?: string): Promise<PortalRes
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(MUSICIAN_ONLY_MESSAGE);
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao criar portal de gerenciamento');
   }
 
   return response.json();
 }
-

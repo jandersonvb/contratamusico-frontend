@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 import { getPaymentHistory } from "@/api/payment";
 import type { PaymentHistoryResponse, PaymentHistoryItem } from "@/api/payment";
 import { useUserStore } from "@/lib/stores/userStore";
+import { UserType } from "@/lib/types/user";
 
 /**
  * Página de histórico de pagamentos
@@ -22,13 +23,14 @@ import { useUserStore } from "@/lib/stores/userStore";
  */
 export default function PaymentHistoryPage() {
   const router = useRouter();
-  const { isLoggedIn, isLoading: isUserLoading } = useUserStore();
+  const { isLoggedIn, isLoading: isUserLoading, user } = useUserStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<PaymentHistoryResponse | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const isClientUser = user?.userType === UserType.CLIENT;
 
   // Verificar autenticação
   useEffect(() => {
@@ -39,7 +41,14 @@ export default function PaymentHistoryPage() {
 
   // Buscar histórico
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || isClientUser) {
+      if (isClientUser) {
+        setHistoryData(null);
+        setError(null);
+        setIsLoading(false);
+      }
+      return;
+    }
 
     const fetchHistory = async () => {
       setIsLoading(true);
@@ -57,7 +66,7 @@ export default function PaymentHistoryPage() {
     };
 
     fetchHistory();
-  }, [currentPage, isLoggedIn]);
+  }, [currentPage, isLoggedIn, isClientUser]);
 
   const formatCurrency = (amount: number, currency: string) => {
     const value = amount / 100; // Valor vem em centavos
@@ -119,10 +128,35 @@ export default function PaymentHistoryPage() {
     }
   };
 
-  if (isUserLoading || (isLoading && !historyData)) {
+  if (isUserLoading || (!isClientUser && isLoading && !historyData)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isClientUser) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <section className="container mx-auto px-4 py-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/perfil")}
+            className="mb-4"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Voltar ao Perfil
+          </Button>
+          <div className="bg-card border rounded-lg p-8 text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
+            <p className="font-medium">Histórico de pagamentos indisponível para contratantes</p>
+            <p className="text-sm text-muted-foreground">
+              Contratantes não possuem assinatura na plataforma e, por isso, não têm histórico de pagamentos de plano.
+            </p>
+          </div>
+        </section>
       </div>
     );
   }
