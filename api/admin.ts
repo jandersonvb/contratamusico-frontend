@@ -15,6 +15,10 @@ function getAuthHeaders(): HeadersInit {
   };
 }
 
+function isAuthStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
 export interface AdminDashboardResponse {
   totalUsers: number;
   totalMusicians: number;
@@ -84,6 +88,9 @@ export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
   });
 
   if (!response.ok) {
+    if (isAuthStatus(response.status)) {
+      throw new Error('Unauthorized');
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao buscar dashboard admin');
   }
@@ -98,6 +105,9 @@ export async function getAdminUsers(page = 1, limit = 20): Promise<PaginatedResp
   });
 
   if (!response.ok) {
+    if (isAuthStatus(response.status)) {
+      throw new Error('Unauthorized');
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao buscar usuários');
   }
@@ -112,6 +122,9 @@ export async function getAdminMusicians(page = 1, limit = 20): Promise<Paginated
   });
 
   if (!response.ok) {
+    if (isAuthStatus(response.status)) {
+      throw new Error('Unauthorized');
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao buscar músicos');
   }
@@ -126,6 +139,9 @@ export async function toggleAdminFeatured(musicianId: number): Promise<{ message
   });
 
   if (!response.ok) {
+    if (isAuthStatus(response.status)) {
+      throw new Error('Unauthorized');
+    }
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || 'Erro ao atualizar destaque do músico');
   }

@@ -68,7 +68,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const pathname = usePathname();
-  const { isLoggedIn, user } = useUserStore();
+  const { isLoggedIn, user, fetchUser, logout } = useUserStore();
   const { unreadCount } = useChatStore();
 
   // Garante que o componente só renderize após a hidratação do Zustand
@@ -79,6 +79,41 @@ export function Navbar() {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!hydrated || !isLoggedIn) return;
+
+    const revalidateSession = () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        logout();
+        return;
+      }
+
+      fetchUser();
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "token" && !event.newValue) {
+        logout();
+      }
+    };
+
+    revalidateSession();
+    window.addEventListener("focus", revalidateSession);
+    document.addEventListener("visibilitychange", revalidateSession);
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("focus", revalidateSession);
+      document.removeEventListener("visibilitychange", revalidateSession);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [hydrated, isLoggedIn, fetchUser, logout]);
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {

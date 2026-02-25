@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Shield, Users, Music2, Briefcase, CreditCard, Star } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,8 @@ const DEFAULT_LIMIT = 20;
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isLoading: isUserLoading, fetchUser } = useUserStore();
+  const { user, isLoggedIn, isLoading: isUserLoading, fetchUser, logout } = useUserStore();
+  const [isSessionValidated, setIsSessionValidated] = useState(false);
 
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
   const [usersData, setUsersData] = useState<PaginatedResponse<AdminUserItem> | null>(null);
@@ -44,16 +45,46 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingMusicians, setLoadingMusicians] = useState(true);
   const [togglingMusicianId, setTogglingMusicianId] = useState<number | null>(null);
+  const didHandleAuthError = useRef(false);
 
   const isAdmin = user?.role === UserRole.ADMIN;
 
   useEffect(() => {
-    if (isLoggedIn && !user) {
-      fetchUser();
-    }
-  }, [isLoggedIn, user, fetchUser]);
+    let isMounted = true;
+
+    const validateSession = async () => {
+      if (!isLoggedIn) {
+        if (isMounted) {
+          setIsSessionValidated(true);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setIsSessionValidated(false);
+      }
+
+      try {
+        await fetchUser();
+      } finally {
+        if (isMounted) {
+          setIsSessionValidated(true);
+        }
+      }
+    };
+
+    validateSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoggedIn, fetchUser]);
 
   useEffect(() => {
+    if (!isSessionValidated) {
+      return;
+    }
+
     if (!isUserLoading && !isLoggedIn) {
       router.push("/login");
       return;
@@ -62,70 +93,89 @@ export default function AdminPage() {
     if (!isUserLoading && isLoggedIn && user && !isAdmin) {
       router.push("/dashboard");
     }
-  }, [isUserLoading, isLoggedIn, user, isAdmin, router]);
+  }, [isSessionValidated, isUserLoading, isLoggedIn, user, isAdmin, router]);
+
+  const handleRequestError = useCallback((error: unknown, fallbackMessage: string) => {
+    const message = error instanceof Error ? error.message : fallbackMessage;
+    const normalizedMessage = message.toLowerCase();
+    const isAuthError =
+      normalizedMessage.includes("unauthorized") ||
+      normalizedMessage.includes("forbidden") ||
+      normalizedMessage.includes("acesso negado") ||
+      normalizedMessage.includes("token não encontrado") ||
+      normalizedMessage.includes("token nao encontrado");
+
+    if (isAuthError) {
+      if (didHandleAuthError.current) return;
+      didHandleAuthError.current = true;
+      logout();
+      toast.error("Sua sessão expirou. Faça login novamente.");
+      router.push("/login");
+      return;
+    }
+
+    toast.error(message);
+  }, [logout, router]);
 
   const loadDashboard = useCallback(async () => {
-    if (!isLoggedIn || !isAdmin) return;
+    if (!isSessionValidated || !isLoggedIn || !isAdmin) return;
 
     setLoadingDashboard(true);
     try {
       const data = await getAdminDashboard();
       setDashboard(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar dashboard admin";
-      toast.error(message);
+      handleRequestError(error, "Erro ao carregar dashboard admin");
     } finally {
       setLoadingDashboard(false);
     }
-  }, [isLoggedIn, isAdmin]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, handleRequestError]);
 
   const loadUsers = useCallback(async () => {
-    if (!isLoggedIn || !isAdmin) return;
+    if (!isSessionValidated || !isLoggedIn || !isAdmin) return;
 
     setLoadingUsers(true);
     try {
       const data = await getAdminUsers(usersPage, DEFAULT_LIMIT);
       setUsersData(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar usuários";
-      toast.error(message);
+      handleRequestError(error, "Erro ao carregar usuários");
     } finally {
       setLoadingUsers(false);
     }
-  }, [isLoggedIn, isAdmin, usersPage]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, usersPage, handleRequestError]);
 
   const loadMusicians = useCallback(async () => {
-    if (!isLoggedIn || !isAdmin) return;
+    if (!isSessionValidated || !isLoggedIn || !isAdmin) return;
 
     setLoadingMusicians(true);
     try {
       const data = await getAdminMusicians(musiciansPage, DEFAULT_LIMIT);
       setMusiciansData(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao carregar músicos";
-      toast.error(message);
+      handleRequestError(error, "Erro ao carregar músicos");
     } finally {
       setLoadingMusicians(false);
     }
-  }, [isLoggedIn, isAdmin, musiciansPage]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, musiciansPage, handleRequestError]);
 
   useEffect(() => {
-    if (isLoggedIn && isAdmin) {
+    if (isSessionValidated && isLoggedIn && isAdmin) {
       loadDashboard();
     }
-  }, [isLoggedIn, isAdmin, loadDashboard]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, loadDashboard]);
 
   useEffect(() => {
-    if (isLoggedIn && isAdmin) {
+    if (isSessionValidated && isLoggedIn && isAdmin) {
       loadUsers();
     }
-  }, [isLoggedIn, isAdmin, loadUsers]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, loadUsers]);
 
   useEffect(() => {
-    if (isLoggedIn && isAdmin) {
+    if (isSessionValidated && isLoggedIn && isAdmin) {
       loadMusicians();
     }
-  }, [isLoggedIn, isAdmin, loadMusicians]);
+  }, [isSessionValidated, isLoggedIn, isAdmin, loadMusicians]);
 
   const handleToggleFeatured = async (musicianId: number) => {
     setTogglingMusicianId(musicianId);
@@ -134,8 +184,7 @@ export default function AdminPage() {
       toast.success(result.message);
       await Promise.all([loadMusicians(), loadDashboard()]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao alterar destaque";
-      toast.error(message);
+      handleRequestError(error, "Erro ao alterar destaque");
     } finally {
       setTogglingMusicianId(null);
     }
@@ -151,7 +200,7 @@ export default function AdminPage() {
     ];
   }, [dashboard]);
 
-  if (isUserLoading || (isLoggedIn && !user) || (isLoggedIn && user && !isAdmin)) {
+  if (!isSessionValidated || isUserLoading || (isLoggedIn && !user) || (isLoggedIn && user && !isAdmin)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
