@@ -34,7 +34,7 @@ import Image from "next/image";
 import { MusicianAvatar } from "@/components/ui/musician-avatar";
 import { MusicianProfile } from "@/lib/types/musician";
 import { createBooking } from "@/api/booking";
-import { sendMessage } from "@/api/chat";
+import { startConversation } from "@/api/chat";
 import { useUserStore } from "@/lib/stores/userStore";
 import { useFavoriteStore } from "@/lib/stores/favoriteStore";
 import { useSocket } from "@/hooks/useSocket";
@@ -64,7 +64,7 @@ function getStarArray(rating: number) {
 export default function MusicianDetailClient({ musician }: MusicianDetailClientProps) {
   const router = useRouter();
   const { isLoggedIn, user, fetchUser } = useUserStore();
-  const { emit, isConnected } = useSocket();
+  const { isConnected } = useSocket();
   const { openFloatingChat, conversations, onlineUsers } = useChatStore();
 
   const [activeTab, setActiveTab] = useState<TabType>("sobre");
@@ -301,8 +301,8 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
 
   /**
    * Abre o FloatingChat com a conversa do músico.
-   * Se já existe uma conversa, abre direto. Senão, envia a primeira mensagem
-   * para criar a conversa e depois abre o FloatingChat.
+   * Se já existe uma conversa, abre direto. Senão, inicia uma conversa vazia
+   * para o usuário escrever a primeira mensagem manualmente.
    */
   const handleStartChat = async () => {
     if (!isLoggedIn) {
@@ -323,73 +323,17 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
       return;
     }
 
-    // Se não existe, cria uma nova conversa enviando a primeira mensagem
+    // Se não existe, cria (ou recupera) a conversa sem mensagem automática
     setIsStartingChat(true);
-    const messageContent = `Olá ${musician.name}! Vi seu perfil e gostaria de conversar sobre contratar seus serviços.`;
 
     try {
-      if (isConnected) {
-        emit(
-          "message:send",
-          {
-            recipientUserId,
-            musicianProfileId: musician.id,
-            content: messageContent,
-          },
-          (response: unknown) => {
-            const res = response as {
-              success: boolean;
-              error?: string;
-              data?: { conversationId?: number };
-              conversationId?: number;
-            };
-            if (res.success) {
-              toast.success("Conversa iniciada!");
-              // Tenta abrir o FloatingChat com o conversationId retornado
-              const convId = res.data?.conversationId || res.conversationId;
-              if (convId) {
-                openFloatingChat(convId);
-              } else {
-                // Aguarda a conversa aparecer na store (via socket) e abre
-                setTimeout(() => {
-                  const conv = useChatStore.getState().conversations.find(
-                    (c) => c.otherParty?.id === recipientUserId || c.musicianProfileId === musician.id
-                  );
-                  if (conv) {
-                    openFloatingChat(conv.id);
-                  }
-                }, 1000);
-              }
-            } else {
-              toast.error(res.error || "Erro ao iniciar conversa");
-            }
-            setIsStartingChat(false);
-          }
-        );
-      } else {
-        // Fallback REST
-        const result = await sendMessage({
-          recipientUserId,
-          musicianProfileId: musician.id,
-          content: messageContent,
-        });
-        toast.success("Conversa iniciada!");
-        // O resultado contém conversationId
-        if (result.conversationId) {
-          openFloatingChat(result.conversationId);
-        } else {
-          // Aguarda a conversa aparecer na store
-          setTimeout(() => {
-            const conv = useChatStore.getState().conversations.find(
-              (c) => c.otherParty?.id === recipientUserId || c.musicianProfileId === musician.id
-            );
-            if (conv) {
-              openFloatingChat(conv.id);
-            }
-          }, 1000);
-        }
-        setIsStartingChat(false);
-      }
+      const result = await startConversation({
+        recipientUserId,
+        musicianProfileId: musician.id,
+      });
+
+      openFloatingChat(result.conversationId);
+      toast.success("Conversa iniciada!");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erro ao iniciar conversa";
@@ -399,6 +343,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
       ) {
         toast.error(message);
       }
+    } finally {
       setIsStartingChat(false);
     }
   };
