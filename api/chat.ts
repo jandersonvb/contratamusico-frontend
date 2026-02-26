@@ -153,6 +153,15 @@ export interface SendMediaMessageData {
   content?: string;
 }
 
+export interface StartConversationData {
+  recipientUserId?: number;
+  musicianProfileId?: number;
+}
+
+export interface StartConversationResponse {
+  conversationId: number;
+}
+
 export interface SendMessageResponse {
   id?: number;
   conversationId?: number;
@@ -480,6 +489,54 @@ export async function sendMessage(data: SendMessageData): Promise<SendMessageRes
   const result = await response.json();
 
   return normalizeMessage(result.data || result);
+}
+
+/**
+ * Inicia (ou recupera) uma conversa sem enviar mensagem automática.
+ */
+export async function startConversation(
+  data: StartConversationData
+): Promise<StartConversationResponse> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Você precisa estar logado para iniciar conversas');
+  }
+
+  const hasRecipient = typeof data.recipientUserId === 'number' && !isNaN(data.recipientUserId);
+  const hasMusicianProfile =
+    typeof data.musicianProfileId === 'number' && !isNaN(data.musicianProfileId);
+
+  if (!hasRecipient && !hasMusicianProfile) {
+    throw new Error('recipientUserId ou musicianProfileId é obrigatório');
+  }
+
+  const response = await fetchWithChatFallback('/conversations/start', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...(hasRecipient ? { recipientUserId: data.recipientUserId } : {}),
+      ...(hasMusicianProfile ? { musicianProfileId: data.musicianProfileId } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.message || errorData?.error || 'Erro ao iniciar conversa';
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  const conversationId = toNumberOrUndefined(result?.conversationId ?? result?.data?.conversationId);
+
+  if (!conversationId) {
+    throw new Error('Resposta inválida ao iniciar conversa');
+  }
+
+  return { conversationId };
 }
 
 /**
