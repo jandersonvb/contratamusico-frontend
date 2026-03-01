@@ -70,6 +70,16 @@ export function Navbar() {
   const pathname = usePathname();
   const { isLoggedIn, user, fetchUser, logout } = useUserStore();
   const { unreadCount } = useChatStore();
+  const isHomeActive = pathname === "/";
+  const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isMessagesActive = pathname === "/mensagens" || pathname.startsWith("/mensagens/");
+  const isBuscaActive = pathname === "/busca" || pathname.startsWith("/busca/");
+  const isComoFuncionaActive = pathname === "/como-funciona" || pathname.startsWith("/como-funciona/");
+  const isContatoActive = pathname === "/contato" || pathname.startsWith("/contato/");
+  const isPlanosActive = pathname === "/planos" || pathname.startsWith("/planos/");
+  const isAdminActive = pathname === "/admin" || pathname.startsWith("/admin/");
+  const desktopNavItemClass =
+    "inline-flex h-full items-center gap-1.5 border-b-[3px] border-transparent px-0.5 text-muted-foreground transition-colors hover:border-primary hover:text-primary";
 
   // Garante que o componente só renderize após a hidratação do Zustand
   useEffect(() => {
@@ -156,18 +166,37 @@ export function Navbar() {
         </Link>
 
         {/* Desktop */}
-        <nav className={cn("hidden items-center gap-6 md:flex")}>
-          <Link href="/" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+        <nav className={cn("hidden h-full items-stretch gap-6 md:flex")}>
+          <Link
+            href="/"
+            className={cn(
+              desktopNavItemClass,
+              isHomeActive && "border-primary text-primary"
+            )}
+          >
             <Home className="h-4 w-4" />
             Início
           </Link>
           {hydrated && isLoggedIn && (
             <>
-              <Link href="/dashboard" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+              <Link
+                href="/dashboard"
+                className={cn(
+                  desktopNavItemClass,
+                  isDashboardActive && "border-primary text-primary"
+                )}
+              >
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </Link>
-              <Link href="/mensagens" className="text-muted-foreground hover:text-foreground relative inline-flex items-center gap-1.5">
+              <Link
+                href="/mensagens"
+                className={cn(
+                  desktopNavItemClass,
+                  "relative",
+                  isMessagesActive && "border-primary text-primary"
+                )}
+              >
                 <MessageCircle className="h-4 w-4" />
                 Mensagens
                 {unreadCount > 0 && (
@@ -178,31 +207,61 @@ export function Navbar() {
               </Link>
             </>
           )}
-          <Link href="/busca" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <Link
+            href="/busca"
+            className={cn(
+              desktopNavItemClass,
+              isBuscaActive && "border-primary text-primary"
+            )}
+          >
             <Search className="h-4 w-4" />
             Buscar Músicos
           </Link>
-          <Link href="/como-funciona" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <Link
+            href="/como-funciona"
+            className={cn(
+              desktopNavItemClass,
+              isComoFuncionaActive && "border-primary text-primary"
+            )}
+          >
             <HelpCircle className="h-4 w-4" />
             Como Funciona
           </Link>
-          <Link href="/contato" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <Link
+            href="/contato"
+            className={cn(
+              desktopNavItemClass,
+              isContatoActive && "border-primary text-primary"
+            )}
+          >
             <Mail className="h-4 w-4" />
             Contato
           </Link>
-          <Link href="/planos" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <Link
+            href="/planos"
+            className={cn(
+              desktopNavItemClass,
+              isPlanosActive && "border-primary text-primary"
+            )}
+          >
             <CreditCard className="h-4 w-4" />
             Planos
           </Link>
           {hydrated && isLoggedIn && user?.role === UserRole.ADMIN && (
-            <Link href="/admin" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+            <Link
+              href="/admin"
+              className={cn(
+                desktopNavItemClass,
+                isAdminActive && "border-primary text-primary"
+              )}
+            >
               <Shield className="h-4 w-4" />
               Admin
             </Link>
           )}
 
           {/* À direita: auth vs avatar */}
-          <div className="ml-2">
+          <div className="ml-2 self-center">
             {!hydrated ? (
               // Placeholder durante hidratação para evitar flash de conteúdo
               <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
@@ -301,17 +360,38 @@ export function Navbar() {
 
             <nav className="flex-1 overflow-y-auto p-4">
               <div className="flex flex-col gap-1">
-                <Link href="/" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                <Link
+                  href="/"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                    isHomeActive && "bg-primary/10 text-primary"
+                  )}
+                >
                   <Home className="h-4 w-4" />
                   Início
                 </Link>
                 {hydrated && isLoggedIn && (
                   <>
-                    <Link href="/dashboard" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                        isDashboardActive && "bg-primary/10 text-primary"
+                      )}
+                    >
                       <LayoutDashboard className="h-4 w-4" />
                       Dashboard
                     </Link>
-                    <Link href="/mensagens" onClick={() => setOpen(false)} className="relative inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                    <Link
+                      href="/mensagens"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "relative inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                        isMessagesActive && "bg-primary/10 text-primary"
+                      )}
+                    >
                       <MessageCircle className="h-4 w-4" />
                       Mensagens
                       {unreadCount > 0 && (
@@ -322,24 +402,59 @@ export function Navbar() {
                     </Link>
                   </>
                 )}
-                <Link href="/busca" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                <Link
+                  href="/busca"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                    isBuscaActive && "bg-primary/10 text-primary"
+                  )}
+                >
                   <Search className="h-4 w-4" />
                   Buscar Músicos
                 </Link>
-                <Link href="/como-funciona" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                <Link
+                  href="/como-funciona"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                    isComoFuncionaActive && "bg-primary/10 text-primary"
+                  )}
+                >
                   <HelpCircle className="h-4 w-4" />
                   Como Funciona
                 </Link>
-                <Link href="/contato" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                <Link
+                  href="/contato"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                    isContatoActive && "bg-primary/10 text-primary"
+                  )}
+                >
                   <Mail className="h-4 w-4" />
                   Contato
                 </Link>
-                <Link href="/planos" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                <Link
+                  href="/planos"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                    isPlanosActive && "bg-primary/10 text-primary"
+                  )}
+                >
                   <CreditCard className="h-4 w-4" />
                   Planos
                 </Link>
                 {hydrated && isLoggedIn && user?.role === UserRole.ADMIN && (
-                  <Link href="/admin" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-primary/10 hover:text-primary",
+                      isAdminActive && "bg-primary/10 text-primary"
+                    )}
+                  >
                     <Shield className="h-4 w-4" />
                     Admin
                   </Link>

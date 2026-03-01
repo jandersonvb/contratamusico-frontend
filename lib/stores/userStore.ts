@@ -7,6 +7,10 @@ import { LoginCredentials, User, UserState, UpdateUserData } from '../types/user
 
 const USER_STORAGE_KEY = 'user-storage';
 const TOKEN_STORAGE_KEY = 'token';
+const FETCH_USER_COOLDOWN_MS = 10000;
+
+let fetchUserInFlight: Promise<void> | null = null;
+let lastFetchUserAt = 0;
 
 const hasStoredToken = () => {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -23,7 +27,7 @@ export const useUserStore = create<UserState>()(
     persist(
       (set, get) => ({
         user: null,
-        isLoading: false,
+        isLoading: true,
         isUpdating: false,
         isLoggedIn: false,
         error: null,
@@ -69,7 +73,9 @@ export const useUserStore = create<UserState>()(
 
         // Busca dados do usuário (usado na reidratação/refresh)
         fetchUser: async () => {
-          if (get().isLoading) return;
+          if (fetchUserInFlight) {
+            return fetchUserInFlight;
+          }
 
           const token = localStorage.getItem(TOKEN_STORAGE_KEY);
 
@@ -83,22 +89,42 @@ export const useUserStore = create<UserState>()(
             return;
           }
 
-          set({ isLoading: true, error: null }, false, 'user/fetchUserStart');
+          const now = Date.now();
+          const hasRecentUserData = !!get().user && now - lastFetchUserAt < FETCH_USER_COOLDOWN_MS;
+          if (hasRecentUserData) {
+            return;
+          }
 
-          try {
-            const userData = await fetchUserDataFromApi();
-            set({ user: userData, isLoading: false, isLoggedIn: true }, false, 'user/fetchUserSuccess');
-          } catch (error) {
-            const message = error instanceof Error ? error.message : 'Erro ao buscar usuário';
-            
-            // Se o erro for Unauthorized (token expirado), desloga
-            if (message === 'Unauthorized') {
-              get().logout();
-              return;
-            } else {
+          fetchUserInFlight = (async () => {
+            set({ isLoading: true, isLoggedIn: true, error: null }, false, 'user/fetchUserStart');
+
+            try {
+              const userData = await fetchUserDataFromApi();
+              set({ user: userData, isLoading: false, isLoggedIn: true }, false, 'user/fetchUserSuccess');
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Erro ao buscar usuário';
+              
+              // Se o erro for Unauthorized (token expirado), desloga
+              if (message === 'Unauthorized') {
+                get().logout();
+                return;
+              }
+
+              // 429 é temporário (throttle). Mantém estado atual sem poluir UX com erro.
+              if (message.includes('429') || message.toLowerCase().includes('too many requests')) {
+                set({ isLoading: false, isLoggedIn: true }, false, 'user/fetchUserThrottled');
+                return;
+              }
+
               set({ error: message, isLoading: false }, false, 'user/fetchUserError');
             }
-          }
+          })()
+            .finally(() => {
+              lastFetchUserAt = Date.now();
+              fetchUserInFlight = null;
+            });
+
+          return fetchUserInFlight;
         },
 
         setUser: (user: User) => {
@@ -119,6 +145,8 @@ export const useUserStore = create<UserState>()(
         },
 
         logout: () => {
+          lastFetchUserAt = 0;
+          fetchUserInFlight = null;
           clearPersistedAuth();
           set({ user: null, error: null, isLoggedIn: false, isLoading: false, isUpdating: false }, false, 'user/logout');
           
@@ -136,7 +164,7 @@ export const useUserStore = create<UserState>()(
         }),
         
         onRehydrateStorage: () => {
-          return (hydratedState) => {
+          return () => {
             // Se não existir token ao hidratar, limpa qualquer estado antigo persistido.
             if (!hasStoredToken()) {
               useUserStore.setState(
@@ -153,12 +181,17 @@ export const useUserStore = create<UserState>()(
               return;
             }
 
-            // Ao recarregar a página:
-            if (hydratedState?.isLoggedIn) {
-              // Se estava logado, tenta buscar os dados atualizados do backend
-              // Isso garante que os dados estejam sempre sincronizados
-              useUserStore.getState().fetchUser();
-            }
+            // Com token presente, considera sessão ativa e valida/sincroniza com o backend.
+            useUserStore.setState(
+              {
+                isLoading: true,
+                isLoggedIn: true,
+                error: null,
+              },
+              false,
+              'user/tokenAfterHydration',
+            );
+            useUserStore.getState().fetchUser().catch(() => undefined);
           };
         },
       }

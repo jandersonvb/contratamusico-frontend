@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio } from "lucide-react";
+import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio, Eye } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -91,7 +97,7 @@ const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
  */
 export default function PerfilPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
+  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser, setUser } = useUserStore();
   const { genres, fetchGenres } = useGenreStore();
   const { instruments, fetchInstruments } = useInstrumentStore();
 
@@ -134,6 +140,8 @@ export default function PerfilPage() {
 
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Portfolio state
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
@@ -530,8 +538,15 @@ export default function PerfilPage() {
 
     setIsUploadingAvatar(true);
     try {
-      await uploadAvatar(file);
-      await fetchUser(); // Recarregar dados do usuário
+      const updatedUser = await uploadAvatar(file);
+
+      // Atualização otimista para feedback imediato, mantendo os campos existentes.
+      if (user) {
+        setUser({ ...user, ...updatedUser });
+      }
+
+      // Sincroniza com o backend para garantir estado completo e assinado.
+      await fetchUser().catch(() => undefined);
       toast.success("Foto de perfil atualizada com sucesso!");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao fazer upload";
@@ -541,6 +556,25 @@ export default function PerfilPage() {
       // Limpar o input para permitir upload do mesmo arquivo novamente
       e.target.value = '';
     }
+  };
+
+  const openAvatarFilePicker = () => {
+    if (isUploadingAvatar || !avatarInputRef.current) {
+      return;
+    }
+
+    // Permite selecionar o mesmo arquivo novamente e ainda disparar onChange.
+    avatarInputRef.current.value = "";
+    avatarInputRef.current.click();
+  };
+
+  const handleViewAvatar = () => {
+    if (!user?.profileImageUrl) {
+      toast.info("Você ainda não possui foto de perfil.");
+      return;
+    }
+
+    window.open(user.profileImageUrl, "_blank", "noopener,noreferrer");
   };
 
   const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -647,50 +681,88 @@ export default function PerfilPage() {
           <aside className="space-y-6">
             {/* Profile card */}
             <div className="bg-card border rounded-lg p-6 text-center">
-              <button
-                type="button"
-                aria-label="Alterar foto de perfil"
-                onClick={() => document.getElementById('avatar-upload')?.click()}
-                disabled={isUploadingAvatar}
-                className="relative inline-block mb-4 group cursor-pointer disabled:cursor-not-allowed"
-              >
-                {isUploadingAvatar && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-white" />
-                  </div>
-                )}
-                {/* Overlay de hover */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 rounded-full transition-colors z-[5]">
-                  <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                {user.profileImageUrl ? (
-                  <Image
-                    src={user.profileImageUrl}
-                    alt={`${user.firstName} ${user.lastName}`}
-                    width={100}
-                    height={100}
-                    className="rounded-full object-cover h-24 w-24"
-                  />
-                ) : (
-                  <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-2xl font-semibold text-primary">
-                      {(user.firstName?.[0] || "").toUpperCase()}
-                      {(user.lastName?.[0] || "").toUpperCase()}
-                    </span>
-                  </div>
-                )}
+              <div className="relative inline-block mb-4">
+                <DropdownMenu open={isAvatarMenuOpen} onOpenChange={setIsAvatarMenuOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Menu da foto de perfil"
+                      disabled={isUploadingAvatar}
+                      className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : "cursor-pointer"} group`}
+                    >
+                      {isUploadingAvatar && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                          <Loader2 className="h-8 w-8 animate-spin text-white" />
+                        </div>
+                      )}
+
+                      <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/40">
+                        <span className="text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                          Trocar foto
+                        </span>
+                      </div>
+
+                      {user.profileImageUrl ? (
+                        <Image
+                          src={user.profileImageUrl}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          width={100}
+                          height={100}
+                          className="rounded-full object-cover h-24 w-24"
+                        />
+                      ) : (
+                        <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-2xl font-semibold text-primary">
+                            {(user.firstName?.[0] || "").toUpperCase()}
+                            {(user.lastName?.[0] || "").toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+
+                  <button
+                    type="button"
+                    aria-label="Menu da foto de perfil"
+                    disabled={isUploadingAvatar}
+                    onClick={() => setIsAvatarMenuOpen(true)}
+                    className="absolute bottom-0 right-0 rounded-full border bg-card p-1.5 text-muted-foreground shadow transition-colors hover:text-primary disabled:cursor-not-allowed"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+
+                  <DropdownMenuContent align="center" side="bottom" className="w-52">
+                    <DropdownMenuItem
+                      className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                      onSelect={handleViewAvatar}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver foto do perfil
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setIsAvatarMenuOpen(false);
+                        openAvatarFilePicker();
+                      }}
+                    >
+                      <Upload className="h-4 w-4" />
+                      Escolher foto do perfil
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <input
                   type="file"
                   id="avatar-upload"
-                  accept="image/jpeg,image/png,image/webp"
+                  ref={avatarInputRef}
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
                   className="hidden"
                   onChange={handleAvatarChange}
                   disabled={isUploadingAvatar}
                 />
-                <span className="absolute bottom-0 right-0 p-1 rounded-full bg-card border shadow text-muted-foreground group-hover:text-primary">
-                  <Camera className="h-4 w-4" />
-                </span>
-              </button>
+              </div>
               <h2 className="text-lg font-semibold">{user.firstName} {user.lastName}</h2>
               {isMusician && musicianProfile?.category && (
                 <p className="text-sm text-muted-foreground mb-2">
@@ -1329,8 +1401,8 @@ export default function PerfilPage() {
                             type="file"
                             id="portfolio-file"
                             accept={canUploadVideoAudio
-                              ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
-                              : "image/jpeg,image/png,image/webp"
+                              ? "image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
+                              : "image/jpeg,image/jpg,image/png,image/webp"
                             }
                             onChange={handlePortfolioFileChange}
                             disabled={isUploadingPortfolio || (!canUploadPhoto && !canUploadVideoAudio)}

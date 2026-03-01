@@ -53,6 +53,7 @@ export interface User {
   phone?: string;
   city?: string;
   state?: string;
+  profileImageKey?: string;
   profileImageUrl?: string;
   musicianProfile?: UserMusicianProfile | null;
   createdAt?: string;
@@ -64,6 +65,7 @@ export interface PublicClientProfile {
   userType: UserType.CLIENT;
   badgeLabel: "Contratante";
   name: string;
+  profileImageKey?: string;
   profileImageUrl?: string;
   city: string | null;
   state: string | null;

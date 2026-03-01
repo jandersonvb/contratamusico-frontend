@@ -1,4 +1,5 @@
 import { PublicClientProfile, UpdateUserData, User } from "@/lib/types/user";
+import { normalizePartialUserPayload, normalizeUserPayload } from "@/lib/utils/userNormalizer";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -29,7 +30,8 @@ export async function fetchUserDataFromApi(): Promise<User> {
     throw new Error(errorData?.message || `Falha ao buscar dados do usuário: ${response.status}`);
   }
 
-  return response.json();
+  const payload = await response.json();
+  return normalizeUserPayload(payload);
 }
 
 /**
@@ -60,14 +62,15 @@ export async function updateUserApi(data: UpdateUserData): Promise<User> {
     throw new Error(errorData?.message || 'Falha ao atualizar dados do usuário');
   }
 
-  return response.json();
+  const payload = await response.json();
+  return normalizeUserPayload(payload);
 }
 
 /**
  * Upload de foto de perfil (avatar)
  * POST /users/me/avatar
  */
-export async function uploadAvatar(file: File): Promise<User> {
+export async function uploadAvatar(file: File): Promise<Partial<User>> {
   const token = localStorage.getItem('token');
 
   if (!token) {
@@ -80,21 +83,35 @@ export async function uploadAvatar(file: File): Promise<User> {
     throw new Error('Arquivo muito grande. Tamanho máximo: 5MB');
   }
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP');
+  // Não bloqueamos tipo no client para evitar falso negativo de MIME.
+  // O backend valida o tipo com segurança e retorna erro detalhado, se inválido.
+
+  const uploadWithField = async (fieldName: 'file' | 'avatar') => {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    return fetch(`${API_URL}/users/me/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  };
+
+  let response = await uploadWithField('file');
+
+  if (!response.ok) {
+    const errorData = await response.clone().json().catch(() => null);
+    const message = String(errorData?.message || '').toLowerCase();
+
+    if (
+      response.status === 400 &&
+      message.includes('nenhum arquivo enviado')
+    ) {
+      response = await uploadWithField('avatar');
+    }
   }
-
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch(`${API_URL}/users/me/avatar`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    body: formData,
-  });
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -104,7 +121,8 @@ export async function uploadAvatar(file: File): Promise<User> {
     throw new Error(errorData?.message || 'Erro ao fazer upload da imagem');
   }
 
-  return response.json();
+  const payload = await response.json().catch(() => null);
+  return normalizePartialUserPayload(payload);
 }
 
 /**
