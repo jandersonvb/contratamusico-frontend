@@ -10,7 +10,7 @@ export function OrganizationSchema() {
     '@type': 'Organization',
     name: 'Contrata Músico',
     url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
+    logo: `${siteUrl}/images/logo.png`,
     description:
       'Plataforma completa para contratar músicos profissionais para eventos, festas, casamentos e shows.',
     contactPoint: {

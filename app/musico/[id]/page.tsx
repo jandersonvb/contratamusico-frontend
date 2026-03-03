@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         description: description.slice(0, 200),
         images: [
           {
-            url: musician.profileImageUrl || `${siteUrl}/default-musician.jpg`,
+            url: musician.profileImageUrl || `${siteUrl}/images/default-musician.svg`,
             width: 800,
             height: 600,
             alt: musician.name,
@@ -58,7 +58,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         card: "summary_large_image",
         title: `${musician.name} - Músico Profissional`,
         description: description.slice(0, 200),
-        images: [musician.profileImageUrl || `${siteUrl}/default-musician.jpg`],
+        images: [musician.profileImageUrl || `${siteUrl}/images/default-musician.svg`],
       },
       alternates: {
         canonical: musicianUrl,

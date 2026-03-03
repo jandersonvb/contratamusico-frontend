@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
 import { useUserStore } from "@/lib/stores/userStore";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -118,23 +119,12 @@ export default function LoginPage() {
                 Entrar
               </Button>
 
-              {/* <div className="flex flex-col gap-3 mt-4">
-                <div className="relative flex items-center justify-center">
-                  <span className="absolute  px-2 text-xs text-muted-foreground mb-2">
-                    ou
-                  </span>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <span className="flex items-center gap-2 justify-center">
-                    <Mail className="h-4 w-4" /> Continuar com Google
-                  </span>
-                </Button>
-                <Button variant="outline" className="w-full">
-                  <span className="flex items-center gap-2 justify-center">
-                    <Facebook className="h-4 w-4" /> Continuar com Facebook
-                  </span>
-                </Button>
-              </div> */}
+              <SocialLoginButtons
+                rememberMe={remember}
+                onSuccess={() => {
+                  router.push("/dashboard");
+                }}
+              />
               <p className="text-[10px] sm:text-xs text-center text-muted-foreground mt-4">
                 Não tem uma conta?{" "}
                 <a href="/cadastro" className="text-primary hover:underline">

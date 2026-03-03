@@ -1,4 +1,10 @@
-import { LoginCredentials, AuthResponse, User, RegisterUserData } from '../lib/types/user';
+import {
+  LoginCredentials,
+  AuthResponse,
+  User,
+  RegisterUserData,
+  SocialLoginCredentials,
+} from '../lib/types/user';
 import { normalizeUserPayload } from '@/lib/utils/userNormalizer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -131,5 +137,32 @@ export async function registerUser(data: RegisterUserData): Promise<AuthResponse
     };
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Erro ao realizar cadastro');
+  }
+}
+
+export async function socialLoginRequest(data: SocialLoginCredentials): Promise<AuthResponse> {
+  try {
+    const response = await fetch(`${API_URL}/auth/social/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Erro ao realizar login social');
+    }
+
+    const payload = await response.json();
+    const normalizedUser = normalizeUserPayload((payload as AuthResponse).user);
+
+    return {
+      ...(payload as AuthResponse),
+      user: normalizedUser,
+    };
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Erro ao realizar login social');
   }
 }

@@ -1,9 +1,15 @@
 import { create } from 'zustand';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
-import { fetchUserDataFromApi, loginRequest } from '@/api/auth';
+import { fetchUserDataFromApi, loginRequest, socialLoginRequest } from '@/api/auth';
 import { updateUserApi } from '@/api/user';
 import { sendStoredUtmAfterAuth } from '@/lib/utm';
-import { LoginCredentials, User, UserState, UpdateUserData } from '../types/user';
+import {
+  LoginCredentials,
+  SocialLoginCredentials,
+  User,
+  UserState,
+  UpdateUserData,
+} from '../types/user';
 
 const USER_STORAGE_KEY = 'user-storage';
 const TOKEN_STORAGE_KEY = 'token';
@@ -68,6 +74,44 @@ export const useUserStore = create<UserState>()(
             const message = error instanceof Error ? error.message : 'Erro ao realizar login';
             set({ error: message, isLoading: false }, false, 'user/loginError');
             throw error; // Re-lança para que o componente de UI possa exibir toast/alerta
+          }
+        },
+
+        socialLogin: async (credentials: SocialLoginCredentials) => {
+          set({ isLoading: true, error: null }, false, 'user/socialLoginStart');
+          try {
+            const data = await socialLoginRequest(credentials);
+
+            localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
+
+            let userData = data.user;
+            try {
+              userData = await fetchUserDataFromApi();
+            } catch {
+              // Fallback para payload do login se /users/me falhar momentaneamente.
+            }
+
+            set(
+              {
+                user: userData,
+                isLoggedIn: true,
+                isLoading: false,
+              },
+              false,
+              'user/socialLoginSuccess',
+            );
+
+            try {
+              await sendStoredUtmAfterAuth(data.access_token);
+            } catch (utmError) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('Falha ao enviar UTM no login social:', utmError);
+              }
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Erro ao realizar login social';
+            set({ error: message, isLoading: false }, false, 'user/socialLoginError');
+            throw error;
           }
         },
 

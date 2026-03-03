@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
 import { toast } from "sonner";
 import { registerUser } from "@/api/auth";
 import { UserType } from "@/lib/types/user";
@@ -106,6 +107,8 @@ export default function CadastroPage() {
     { value: "800-1200", label: "R$ 800 - R$ 1.200" },
     { value: "1200+", label: "R$ 1.200+" },
   ];
+  const selectedSocialUserType =
+    userType === "musico" ? UserType.MUSICIAN : UserType.CLIENT;
 
   const handleCheckboxChange = (
     key: "instruments" | "genres",
@@ -504,7 +507,10 @@ export default function CadastroPage() {
                       Termos de Uso
                     </a>{" "}
                     e a{" "}
-                    <a href="#" className="text-primary underline">
+                    <a
+                      href="/politica-de-privacidade"
+                      className="text-primary underline"
+                    >
                       Política de Privacidade
                     </a>
                   </span>
@@ -522,21 +528,15 @@ export default function CadastroPage() {
                     "Criar Conta"
                   )}
                 </Button>
-                {/* <div className="relative flex items-center justify-center">
-                  <span className="absolute bg-card px-2 text-xs text-muted-foreground">
-                    ou
-                  </span>
-                  <div className="h-px w-full bg-border" />
-                </div>
-                <div className="flex flex-col  gap-3">
-                  <Button variant="outline" className="w-full">
-                    <i className="fab fa-google mr-2" /> Continuar com Google
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <i className="fab fa-facebook-f mr-2" /> Continuar com
-                    Facebook
-                  </Button>
-                </div> */}
+                <SocialLoginButtons
+                  userType={selectedSocialUserType}
+                  terms={form.terms}
+                  enforceSignupRequirements
+                  successMessage="Autenticação social realizada com sucesso!"
+                  onSuccess={() => {
+                    router.push("/dashboard");
+                  }}
+                />
               </div>
               <p className="text-center text-sm text-muted-foreground">
                 Já tem uma conta?{" "}
