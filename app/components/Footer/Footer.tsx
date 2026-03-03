@@ -57,6 +57,9 @@ export function Footer() {
             <li>
               <Link href="/planos" className="hover:text-foreground transition-colors duration-200">Planos</Link>
             </li>
+            <li>
+              <Link href="/politica-de-privacidade" className="hover:text-foreground transition-colors duration-200">Política de privacidade</Link>
+            </li>
           </ul>
         </nav>
         <div>

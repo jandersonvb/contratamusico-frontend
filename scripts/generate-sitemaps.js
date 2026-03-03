@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs')
 const path = require('path')
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://contratamusico.com.br').replace(/\/$/, '')
-const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+const defaultApiUrl = process.env.NODE_ENV === 'production' ? siteUrl : 'http://localhost:3000'
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || defaultApiUrl).replace(/\/$/, '')
+const allowEmptyDynamicSitemap = process.env.ALLOW_EMPTY_DYNAMIC_SITEMAP === 'true'
 const publicDir = path.join(process.cwd(), 'public')
 
 const STATIC_ROUTES = [
@@ -46,6 +49,43 @@ function buildSitemapIndexXml(sitemaps) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${nodes}\n</sitemapindex>\n`
 }
 
+function countUrlNodes(xml) {
+  return (xml.match(/<url>/g) || []).length
+}
+
+function readExistingDynamicSitemap(filePath) {
+  if (!fs.existsSync(filePath)) return null
+
+  const currentXml = fs.readFileSync(filePath, 'utf8')
+  if (countUrlNodes(currentXml) === 0) return null
+
+  return currentXml
+}
+
+async function fetchWithRetries(url, attempts = 3, delayMs = 1200) {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`)
+      }
+
+      return response
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Erro desconhecido ao consultar API')
+
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  }
+
+  throw new Error(`Falha ao consultar ${url} após ${attempts} tentativas: ${lastError?.message || 'erro desconhecido'}`)
+}
+
 async function fetchDynamicMusicianUrls() {
   const entries = []
   const limit = 100
@@ -53,14 +93,10 @@ async function fetchDynamicMusicianUrls() {
   let totalPages = 1
 
   while (page <= totalPages) {
-    const response = await fetch(`${apiUrl}/musicians?page=${page}&limit=${limit}`)
-
-    if (!response.ok) {
-      throw new Error(`Falha ao buscar músicos para sitemap dinâmico (status ${response.status})`)
-    }
+    const response = await fetchWithRetries(`${apiUrl}/musicians?page=${page}&limit=${limit}`)
 
     const payload = await response.json()
-    const musicians = Array.isArray(payload) ? payload : payload?.data || []
+    const musicians = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
 
     if (!Array.isArray(musicians)) {
       throw new Error('Formato inesperado da API de músicos para sitemap dinâmico')
@@ -78,7 +114,8 @@ async function fetchDynamicMusicianUrls() {
       })
     }
 
-    totalPages = Number(payload?.pagination?.totalPages || 1)
+    const parsedTotalPages = Number(payload?.pagination?.totalPages || 1)
+    totalPages = Number.isFinite(parsedTotalPages) && parsedTotalPages > 0 ? parsedTotalPages : 1
     page += 1
   }
 
@@ -96,23 +133,52 @@ async function generate() {
     priority: route.priority,
   }))
 
-  const dynamicEntries = await fetchDynamicMusicianUrls().catch((error) => {
-    console.warn(`[sitemap] Aviso: não foi possível gerar sitemap dinâmico via API: ${error.message}`)
-    return []
-  })
+  const dynamicSitemapPath = path.join(publicDir, 'sitemap-dinamico.xml')
+
+  let dynamicEntries = []
+  let dynamicFetchError = null
+
+  try {
+    dynamicEntries = await fetchDynamicMusicianUrls()
+  } catch (error) {
+    dynamicFetchError = error instanceof Error ? error : new Error('Erro desconhecido ao gerar sitemap dinâmico')
+    console.warn(`[sitemap] Aviso: não foi possível gerar sitemap dinâmico via API: ${dynamicFetchError.message}`)
+  }
 
   const staticSitemapXml = buildSitemapXml(staticEntries)
-  const dynamicSitemapXml = buildSitemapXml(dynamicEntries)
+
+  let dynamicSitemapXml = ''
+
+  if (dynamicEntries.length > 0) {
+    dynamicSitemapXml = buildSitemapXml(dynamicEntries)
+  } else {
+    const existingDynamicSitemapXml = readExistingDynamicSitemap(dynamicSitemapPath)
+
+    if (existingDynamicSitemapXml) {
+      dynamicSitemapXml = existingDynamicSitemapXml
+      console.warn('[sitemap] Aviso: reutilizando sitemap dinâmico existente porque a API não retornou URLs.')
+    } else {
+      if (process.env.NODE_ENV === 'production' && !allowEmptyDynamicSitemap && dynamicFetchError) {
+        const reason = dynamicFetchError.message
+        throw new Error(
+          `[sitemap] Em produção, sitemap dinâmico vazio não é permitido (${reason}). Configure NEXT_PUBLIC_API_URL/API_URL ou ALLOW_EMPTY_DYNAMIC_SITEMAP=true.`
+        )
+      }
+
+      dynamicSitemapXml = buildSitemapXml([])
+    }
+  }
+
   const sitemapIndexXml = buildSitemapIndexXml([
     `${siteUrl}/sitemap.xml`,
     `${siteUrl}/sitemap-dinamico.xml`,
   ])
 
   fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), staticSitemapXml)
-  fs.writeFileSync(path.join(publicDir, 'sitemap-dinamico.xml'), dynamicSitemapXml)
+  fs.writeFileSync(dynamicSitemapPath, dynamicSitemapXml)
   fs.writeFileSync(path.join(publicDir, 'sitemap-index.xml'), sitemapIndexXml)
 
-  console.log(`[sitemap] Gerado com ${staticEntries.length} URLs estáticas e ${dynamicEntries.length} URLs dinâmicas.`)
+  console.log(`[sitemap] Gerado com ${staticEntries.length} URLs estáticas e ${countUrlNodes(dynamicSitemapXml)} URLs dinâmicas.`)
 }
 
 generate().catch((error) => {

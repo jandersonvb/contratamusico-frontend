@@ -76,7 +76,7 @@ export const metadata: Metadata = {
       "Plataforma completa para contratar músicos profissionais. Encontre bandas, DJs, cantores e instrumentistas para casamentos, festas e eventos.",
     images: [
       {
-        url: `${siteUrl}/og-image.jpg`,
+        url: `${siteUrl}/images/logo.png`,
         width: 1200,
         height: 630,
         alt: "Contrata Músico",
@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     title: "Contrata Músico - Encontre Músicos Profissionais para seu Evento",
     description: 
       "Plataforma completa para contratar músicos profissionais. Encontre bandas, DJs, cantores e instrumentistas para casamentos, festas e eventos.",
-    images: [`${siteUrl}/og-image.jpg`],
+    images: [`${siteUrl}/images/logo.png`],
     creator: "@contratamusico",
     site: "@contratamusico",
   },

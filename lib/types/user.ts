@@ -85,6 +85,7 @@ export interface UserState {
   // Actions
   fetchUser: () => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
+  socialLogin: (credentials: SocialLoginCredentials) => Promise<void>;
   logout: () => void;
   setUser: (user: User) => void;
   updateUser: (data: UpdateUserData) => Promise<void>;
@@ -95,6 +96,19 @@ export interface LoginCredentials {
   email: string;
   password: string;
   rememberMe?: boolean;
+}
+
+export enum SocialLoginProvider {
+  GOOGLE = 'GOOGLE',
+  FACEBOOK = 'FACEBOOK',
+}
+
+export interface SocialLoginCredentials {
+  provider: SocialLoginProvider;
+  token: string;
+  rememberMe?: boolean;
+  userType?: UserType;
+  terms?: boolean;
 }
 
 export interface AuthResponse {

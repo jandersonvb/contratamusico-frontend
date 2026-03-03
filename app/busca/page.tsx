@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
-import { SEO } from "../components/SEO/SEO";
 import { Pagination } from "./components/Pagination";
 import {
   Select,
@@ -185,17 +184,6 @@ function SearchPageContent() {
 
   return (
     <>
-      <SEO
-        title="Buscar Músicos"
-        description="Encontre os melhores músicos profissionais para seu evento. Filtre por instrumento, estilo musical, localização e mais. Contrate de forma fácil e segura."
-        keywords={[
-          "buscar músico",
-          "encontrar banda",
-          "contratar DJ",
-          "músicos disponíveis",
-          "busca de músicos",
-        ]}
-      />
       <div className="min-h-screen flex flex-col">
         <section className="bg-primary/5 border-b py-6 sm:py-12">
           <div className="container mx-auto px-4 text-center space-y-3 sm:space-y-4">

@@ -6,7 +6,6 @@ import {
   howItWorksClient,
   howItWorksMusician,
 } from "@/app/lib/data/comoFunciona";
-import { SEO } from "../components/SEO/SEO";
 import {
   Accordion,
   AccordionContent,
@@ -23,17 +22,6 @@ export default function ComoFuncionaPage() {
 
   return (
     <>
-      <SEO
-        title="Como Funciona"
-        description="Descubra como funciona o Contrata Músico. Guia completo para contratar músicos profissionais para seu evento ou começar a trabalhar como músico. Simples, rápido e seguro."
-        keywords={[
-          "como contratar músico",
-          "como funciona contrata músico",
-          "guia para contratar banda",
-          "trabalhar como músico",
-          "plataforma de músicos",
-        ]}
-      />
       <div className="min-h-screen flex flex-col">
         {/* Hero Section */}
       <section className="bg-primary/5 py-10 sm:py-16 md:py-24">

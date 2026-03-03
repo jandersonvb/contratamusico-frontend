@@ -19,7 +19,7 @@ export function MusicianSchema({ musician }: MusicianSchemaProps) {
     '@type': 'Person',
     name: musician.name,
     description: musician.bio || `${musician.name} - Músico profissional especializado em ${musician.genres?.map(g => g.name).join(', ') || 'diversos estilos'}`,
-    image: musician.profileImageUrl || `${siteUrl}/default-musician.jpg`,
+    image: musician.profileImageUrl || `${siteUrl}/images/default-musician.svg`,
     url: `${siteUrl}/musico/${musician.id}`,
     jobTitle: 'Músico Profissional',
     knowsAbout: musician.genres?.map(g => g.name) || [],
