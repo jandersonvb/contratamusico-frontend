@@ -83,7 +83,7 @@ export interface UserState {
   error: string | null;
   
   // Actions
-  fetchUser: () => Promise<void>;
+  fetchUser: (force?: boolean) => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
   socialLogin: (credentials: SocialLoginCredentials) => Promise<void>;
   logout: () => void;

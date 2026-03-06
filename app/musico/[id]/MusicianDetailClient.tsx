@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { PortfolioMediaDialog } from "@/components/portfolio/PortfolioMediaDialog";
 import {
   Select,
   SelectContent,
@@ -83,6 +84,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
     content: "",
   });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [selectedPortfolioItem, setSelectedPortfolioItem] = useState<MusicianProfile["portfolio"][number] | null>(null);
 
   const canCreateReview = isLoggedIn && user?.userType === UserType.CLIENT;
   const isMusicianOnline = isConnected && onlineUsers.has(musician.userId);
@@ -590,10 +592,12 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         </button>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        {musician.portfolio?.slice(0, 3).map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="relative aspect-square rounded-lg overflow-hidden bg-muted group cursor-pointer"
+                        {musician.portfolio?.slice(0, 3).map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setSelectedPortfolioItem(item)}
+                            className="relative aspect-square rounded-lg overflow-hidden bg-muted group cursor-pointer text-left"
                           >
                             {item.type === "IMAGE" && item.url ? (
                               <Image
@@ -605,13 +609,15 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                               />
                             ) : item.type === "VIDEO" && item.url ? (
                               <>
-                                <Image
+                                <video
                                   src={item.url}
-                                  alt={item.title || "Portfolio"}
-                                  fill
-                                  className="object-cover"
-                                  unoptimized
-                                />
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  className="h-full w-full object-cover"
+                                >
+                                  Seu navegador não suporta a reprodução de vídeo.
+                                </video>
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                                   <Play className="h-8 w-8 text-white" />
                                 </div>
@@ -628,7 +634,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                                 {item.title}
                               </span>
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </section>
@@ -815,10 +821,12 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                 <h2 className="text-xl font-semibold mb-6">Portfólio</h2>
                 {musician.portfolio && musician.portfolio?.length > 0 ? (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {musician.portfolio?.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-card border rounded-lg overflow-hidden group hover:shadow-md transition-shadow"
+                    {musician.portfolio?.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedPortfolioItem(item)}
+                        className="bg-card border rounded-lg overflow-hidden group hover:shadow-md transition-shadow text-left"
                       >
                         {item.type === "IMAGE" && item.url && (
                           <div className="relative aspect-video">
@@ -833,13 +841,15 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         )}
                         {item.type === "VIDEO" && item.url && (
                           <div className="relative aspect-video">
-                            <Image
+                            <video
                               src={item.url}
-                              alt={item.title || "Portfolio item"}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="h-full w-full object-cover"
+                            >
+                              Seu navegador não suporta a reprodução de vídeo.
+                            </video>
                             <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/50 transition-colors">
                               <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
                                 <Play className="h-8 w-8 text-white" />
@@ -849,12 +859,12 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                         )}
                         {item.type === "AUDIO" && (
                           <div className="flex items-center gap-4 p-4 bg-muted/30">
-                            <button
-                              className="p-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                              aria-label="Ouvir áudio"
+                            <div
+                              className="p-3 rounded-full bg-primary/10 text-primary"
+                              aria-hidden="true"
                             >
                               <Play className="h-5 w-5" />
-                            </button>
+                            </div>
                             <div className="flex flex-col min-w-0">
                               <span className="font-medium text-sm truncate">
                                 {item.title}
@@ -892,7 +902,7 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
                             )}
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (
@@ -1238,6 +1248,10 @@ export default function MusicianDetailClient({ musician }: MusicianDetailClientP
             )}
           </div>
         </div>
+        <PortfolioMediaDialog
+          item={selectedPortfolioItem}
+          onClose={() => setSelectedPortfolioItem(null)}
+        />
       </div>
     </>
   );

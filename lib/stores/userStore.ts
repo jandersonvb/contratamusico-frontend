@@ -116,8 +116,8 @@ export const useUserStore = create<UserState>()(
         },
 
         // Busca dados do usuário (usado na reidratação/refresh)
-        fetchUser: async () => {
-          if (fetchUserInFlight) {
+        fetchUser: async (force = false) => {
+          if (fetchUserInFlight && !force) {
             return fetchUserInFlight;
           }
 
@@ -134,7 +134,8 @@ export const useUserStore = create<UserState>()(
           }
 
           const now = Date.now();
-          const hasRecentUserData = !!get().user && now - lastFetchUserAt < FETCH_USER_COOLDOWN_MS;
+          const hasRecentUserData =
+            !force && !!get().user && now - lastFetchUserAt < FETCH_USER_COOLDOWN_MS;
           if (hasRecentUserData) {
             return;
           }
