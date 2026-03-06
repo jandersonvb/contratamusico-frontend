@@ -19,13 +19,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PortfolioMediaDialog } from "@/components/portfolio/PortfolioMediaDialog";
 
-import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio, Eye } from "lucide-react";
+import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio, Eye, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/userStore";
 import { UserType } from "@/lib/types/user";
+import {
+  normalizePortfolioUploadFile,
+  PORTFOLIO_IMAGE_ACCEPT,
+  PORTFOLIO_MEDIA_ACCEPT,
+} from "@/lib/portfolioUpload";
 import { getMySubscription, cancelSubscription, reactivateSubscription, createPortalSession } from "@/api/payment";
 import type { SubscriptionResponse } from "@/api/payment";
 import {
@@ -89,6 +95,16 @@ const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
   configuracoes: "Configurações",
 };
 
+function createEmptyUploadForm() {
+  return {
+    title: "",
+    description: "",
+    date: "",
+    location: "",
+    genre: "",
+  };
+}
+
 /**
  * Profile page that allows the logged in musician to view and edit their
  * personal and musical information. It also shows a summary card with
@@ -98,7 +114,7 @@ const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
  */
 export default function PerfilPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser, setUser } = useUserStore();
+  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
   const { genres, fetchGenres } = useGenreStore();
   const { instruments, fetchInstruments } = useInstrumentStore();
 
@@ -142,20 +158,23 @@ export default function PerfilPage() {
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
+  const [avatarLocalPreviewUrl, setAvatarLocalPreviewUrl] = useState<string | null>(null);
+  const [avatarRemoteUrlBeforeUpload, setAvatarRemoteUrlBeforeUpload] = useState<string | null>(null);
 
   // Portfolio state
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadForm, setUploadForm] = useState({
-    title: "",
-    description: "",
-    date: "",
-    location: "",
-    genre: "",
-  });
+  const [uploadForm, setUploadForm] = useState(createEmptyUploadForm);
+  const [selectedPortfolioFile, setSelectedPortfolioFile] = useState<File | null>(null);
+  const [portfolioPreviewItem, setPortfolioPreviewItem] = useState<PortfolioItem | null>(null);
+  const [portfolioItemToDelete, setPortfolioItemToDelete] = useState<PortfolioItem | null>(null);
+  const [isDeletingPortfolioItem, setIsDeletingPortfolioItem] = useState(false);
+  const [selectedPortfolioPreviewUrl, setSelectedPortfolioPreviewUrl] = useState<string | null>(null);
+  const [isDraggingPortfolioFile, setIsDraggingPortfolioFile] = useState(false);
+  const portfolioInputRef = useRef<HTMLInputElement>(null);
 
   const currentPlan = subscriptionData?.subscription?.plan;
   const subscription = subscriptionData?.subscription;
@@ -180,6 +199,7 @@ export default function PerfilPage() {
   const canUploadPhoto = currentPlan?.maxPhotos === null || photosCount < maxPhotosLimit;
   // Para vídeos, verificamos se é ilimitado (null) ou se o contador é menor que o limite
   const canUploadVideoAudio = currentPlan?.maxVideos === null || (currentPlan?.maxVideos !== undefined && videosCount < maxVideosLimit);
+  const isPortfolioFileSelectionDisabled = isUploadingPortfolio || (!canUploadPhoto && !canUploadVideoAudio);
 
   const planName = currentPlan?.title || "Básico";
 
@@ -242,6 +262,32 @@ export default function PerfilPage() {
   }, [isMusician, fetchGenres, fetchInstruments]);
 
   useEffect(() => {
+    return () => {
+      if (avatarLocalPreviewUrl) {
+        URL.revokeObjectURL(avatarLocalPreviewUrl);
+      }
+    };
+  }, [avatarLocalPreviewUrl]);
+
+  useEffect(() => {
+    if (!avatarLocalPreviewUrl) {
+      return;
+    }
+
+    const currentAvatarUrl = user?.profileImageUrl ?? null;
+    const hasServerAvatarUpdated =
+      !!currentAvatarUrl &&
+      (avatarRemoteUrlBeforeUpload === null || currentAvatarUrl !== avatarRemoteUrlBeforeUpload);
+
+    if (!hasServerAvatarUpdated) {
+      return;
+    }
+
+    setAvatarLocalPreviewUrl(null);
+    setAvatarRemoteUrlBeforeUpload(null);
+  }, [avatarLocalPreviewUrl, avatarRemoteUrlBeforeUpload, user?.profileImageUrl]);
+
+  useEffect(() => {
     const syncTabFromUrl = () => {
       const tabParam = new URLSearchParams(window.location.search).get("tab");
       if (tabParam && availableTabs.includes(tabParam as ProfileTab)) {
@@ -262,6 +308,14 @@ export default function PerfilPage() {
     setActiveTab(fallbackTab);
     router.replace(`/perfil?tab=${fallbackTab}`, { scroll: false });
   }, [activeTab, availableTabs, router, user]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPortfolioPreviewUrl) {
+        URL.revokeObjectURL(selectedPortfolioPreviewUrl);
+      }
+    };
+  }, [selectedPortfolioPreviewUrl]);
 
   const fetchSubscriptionData = useCallback(async () => {
     if (!isMusician) {
@@ -545,19 +599,19 @@ export default function PerfilPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const localPreviewUrl = URL.createObjectURL(file);
+    setIsAvatarMenuOpen(false);
+    setIsAvatarPreviewOpen(false);
+    setAvatarLocalPreviewUrl(localPreviewUrl);
+    setAvatarRemoteUrlBeforeUpload(user?.profileImageUrl ?? null);
     setIsUploadingAvatar(true);
     try {
-      const updatedUser = await uploadAvatar(file);
-
-      // Atualização otimista para feedback imediato, mantendo os campos existentes.
-      if (user) {
-        setUser({ ...user, ...updatedUser });
-      }
-
-      // Sincroniza com o backend para garantir estado completo e assinado.
-      await fetchUser().catch(() => undefined);
+      await uploadAvatar(file);
+      await fetchUser(true).catch(() => undefined);
       toast.success("Foto de perfil atualizada com sucesso!");
     } catch (error) {
+      setAvatarLocalPreviewUrl(null);
+      setAvatarRemoteUrlBeforeUpload(null);
       const message = error instanceof Error ? error.message : "Erro ao fazer upload";
       toast.error(message);
     } finally {
@@ -567,44 +621,79 @@ export default function PerfilPage() {
     }
   };
 
-  const openAvatarFilePicker = () => {
-    if (isUploadingAvatar || !avatarInputRef.current) {
-      return;
-    }
-
-    // Permite selecionar o mesmo arquivo novamente e ainda disparar onChange.
-    avatarInputRef.current.value = "";
-    avatarInputRef.current.click();
-  };
-
   const handleViewAvatar = () => {
     if (!user?.profileImageUrl) {
       toast.info("Você ainda não possui foto de perfil.");
       return;
     }
 
-    window.open(user.profileImageUrl, "_blank", "noopener,noreferrer");
+    setIsAvatarMenuOpen(false);
+    setIsAvatarPreviewOpen(true);
   };
 
-  const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const resetPortfolioUploadForm = () => {
+    setUploadForm(createEmptyUploadForm());
+    setSelectedPortfolioFile(null);
+    setSelectedPortfolioPreviewUrl(null);
+    setIsDraggingPortfolioFile(false);
 
-    if (!uploadForm.title.trim()) {
-      toast.error("Por favor, informe um título para o item");
+    if (portfolioInputRef.current) {
+      portfolioInputRef.current.value = "";
+    }
+  };
+
+  const closeUploadModal = () => {
+    if (isUploadingPortfolio) {
       return;
     }
 
-    // Verificar restrições de plano
-    const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const videoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-    const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg'];
-    const isImage = imageTypes.includes(file.type);
-    const isVideoOrAudio = videoTypes.includes(file.type) || audioTypes.includes(file.type);
+    setShowUploadModal(false);
+    resetPortfolioUploadForm();
+  };
+
+  const openUploadModal = () => {
+    resetPortfolioUploadForm();
+    setShowUploadModal(true);
+  };
+
+  const clearSelectedPortfolioFile = () => {
+    setSelectedPortfolioFile(null);
+    setSelectedPortfolioPreviewUrl(null);
+    setIsDraggingPortfolioFile(false);
+
+    if (portfolioInputRef.current) {
+      portfolioInputRef.current.value = "";
+    }
+  };
+
+  const setPortfolioFile = (
+    file: File | null,
+    inputElement?: HTMLInputElement | null,
+  ) => {
+    if (!file) {
+      setSelectedPortfolioFile(null);
+      return;
+    }
+
+    const normalizedUpload = normalizePortfolioUploadFile(file);
+
+    if (!normalizedUpload) {
+      toast.error("Formato não suportado. Use imagem, vídeo ou áudio compatível.");
+      if (inputElement) {
+        inputElement.value = "";
+      }
+      return;
+    }
+
+    const { file: normalizedFile, rule } = normalizedUpload;
+    const isImage = rule.kind === "IMAGE";
+    const isVideoOrAudio = rule.kind === "VIDEO" || rule.kind === "AUDIO";
 
     if (isImage && !canUploadPhoto) {
       toast.error(`Você atingiu o limite de ${maxPhotosLimit} fotos do plano ${planName}. Faça upgrade para adicionar mais.`);
-      e.target.value = '';
+      if (inputElement) {
+        inputElement.value = "";
+      }
       return;
     }
 
@@ -614,14 +703,66 @@ export default function PerfilPage() {
           ? `Seu plano atual (${planName}) não permite vídeos/áudios. Faça upgrade.`
           : `Você atingiu o limite de ${maxVideosLimit} vídeos/áudios do plano ${planName}.`
       );
-      e.target.value = '';
+      if (inputElement) {
+        inputElement.value = "";
+      }
+      return;
+    }
+
+    const nextPreviewUrl =
+      normalizedFile.type.startsWith("image/") || normalizedFile.type.startsWith("video/")
+        ? URL.createObjectURL(normalizedFile)
+        : null;
+
+    setSelectedPortfolioPreviewUrl(nextPreviewUrl);
+    setSelectedPortfolioFile(normalizedFile);
+  };
+
+  const handlePortfolioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPortfolioFile(e.target.files?.[0] ?? null, e.target);
+  };
+
+  const handlePortfolioFileDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    if (isPortfolioFileSelectionDisabled) {
+      return;
+    }
+
+    setIsDraggingPortfolioFile(true);
+  };
+
+  const handlePortfolioFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingPortfolioFile(false);
+  };
+
+  const handlePortfolioFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingPortfolioFile(false);
+
+    if (isPortfolioFileSelectionDisabled) {
+      return;
+    }
+
+    setPortfolioFile(e.dataTransfer.files?.[0] ?? null, portfolioInputRef.current);
+  };
+
+  const handleSubmitPortfolioUpload = async () => {
+    if (!uploadForm.title.trim()) {
+      toast.error("Por favor, informe um título para o item.");
+      return;
+    }
+
+    if (!selectedPortfolioFile) {
+      toast.error("Selecione uma foto, vídeo ou áudio para enviar.");
       return;
     }
 
     setIsUploadingPortfolio(true);
     try {
-      await uploadPortfolioFile(file, {
-        title: uploadForm.title,
+      await uploadPortfolioFile(selectedPortfolioFile, {
+        title: uploadForm.title.trim(),
         description: uploadForm.description || undefined,
         date: uploadForm.date || undefined,
         location: uploadForm.location || undefined,
@@ -630,35 +771,32 @@ export default function PerfilPage() {
 
       toast.success("Arquivo adicionado ao portfólio com sucesso!");
       setShowUploadModal(false);
-      setUploadForm({
-        title: "",
-        description: "",
-        date: "",
-        location: "",
-        genre: "",
-      });
+      resetPortfolioUploadForm();
       await fetchPortfolio(); // Recarregar portfólio
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao fazer upload";
       toast.error(message);
     } finally {
       setIsUploadingPortfolio(false);
-      e.target.value = '';
     }
   };
 
-  const handleDeletePortfolioItem = async (itemId: number) => {
-    if (!confirm("Tem certeza que deseja remover este item do portfólio?")) {
+  const handleDeletePortfolioItem = async () => {
+    if (!portfolioItemToDelete) {
       return;
     }
 
+    setIsDeletingPortfolioItem(true);
     try {
-      await deletePortfolioItem(itemId);
+      await deletePortfolioItem(portfolioItemToDelete.id);
       toast.success("Item removido com sucesso!");
+      setPortfolioItemToDelete(null);
       await fetchPortfolio(); // Recarregar portfólio
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao remover item";
       toast.error(message);
+    } finally {
+      setIsDeletingPortfolioItem(false);
     }
   };
 
@@ -669,8 +807,45 @@ export default function PerfilPage() {
       case 'AUDIO':
         return <FileAudio className="h-5 w-5" />;
       default:
-        return <Music className="h-5 w-5" />;
+        return <ImageIcon className="h-5 w-5" />;
     }
+  };
+
+  const getPortfolioFileKindLabel = (file: File) => {
+    const normalizedUpload = normalizePortfolioUploadFile(file);
+
+    switch (normalizedUpload?.rule.kind) {
+      case "IMAGE":
+        return "Foto";
+      case "VIDEO":
+        return "Vídeo";
+      case "AUDIO":
+        return "Áudio";
+      default:
+        return "Arquivo";
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  const formatPortfolioDate = (date?: string) => {
+    if (!date) {
+      return null;
+    }
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return date;
+    }
+
+    return parsedDate.toLocaleDateString("pt-BR");
   };
 
   // Loading state
@@ -681,6 +856,9 @@ export default function PerfilPage() {
       </div>
     );
   }
+
+  const profileDisplayName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Perfil";
+  const avatarDisplayUrl = avatarLocalPreviewUrl || user.profileImageUrl || undefined;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -695,7 +873,7 @@ export default function PerfilPage() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Menu da foto de perfil"
+                      aria-label="Opções da foto de perfil"
                       disabled={isUploadingAvatar}
                       className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : "cursor-pointer"} group`}
                     >
@@ -707,16 +885,18 @@ export default function PerfilPage() {
 
                       <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/40">
                         <span className="text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          Trocar foto
+                          Ver opções
                         </span>
                       </div>
 
-                      {user.profileImageUrl ? (
+                      {avatarDisplayUrl ? (
                         <Image
-                          src={user.profileImageUrl}
-                          alt={`${user.firstName} ${user.lastName}`}
+                          src={avatarDisplayUrl}
+                          alt={profileDisplayName}
                           width={100}
                           height={100}
+                          key={avatarDisplayUrl}
+                          unoptimized={avatarDisplayUrl.startsWith("blob:")}
                           className="rounded-full object-cover h-24 w-24"
                         />
                       ) : (
@@ -730,44 +910,46 @@ export default function PerfilPage() {
                     </button>
                   </DropdownMenuTrigger>
 
-                  <button
-                    type="button"
-                    aria-label="Menu da foto de perfil"
-                    disabled={isUploadingAvatar}
-                    onClick={() => setIsAvatarMenuOpen(true)}
-                    className="absolute bottom-0 right-0 rounded-full border bg-card p-1.5 text-muted-foreground shadow transition-colors hover:text-primary disabled:cursor-not-allowed"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </button>
-
                   <DropdownMenuContent align="center" side="bottom" className="w-52">
-                    <DropdownMenuItem
-                      className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                      onSelect={handleViewAvatar}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Ver foto do perfil
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        setIsAvatarMenuOpen(false);
-                        openAvatarFilePicker();
-                      }}
-                    >
-                      <Upload className="h-4 w-4" />
-                      Escolher foto do perfil
+                    {avatarDisplayUrl && (
+                      <DropdownMenuItem
+                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                        onSelect={handleViewAvatar}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver foto do perfil
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem asChild>
+                      <label
+                        htmlFor="avatar-upload"
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Escolher foto do perfil
+                      </label>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                <label
+                  htmlFor="avatar-upload"
+                  aria-label="Escolher foto do perfil"
+                  className={`absolute bottom-0 right-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow transition-colors hover:text-primary ${
+                    isUploadingAvatar ? "pointer-events-none opacity-70" : "cursor-pointer"
+                  }`}
+                >
+                  <Camera className="h-4 w-4" />
+                </label>
+
                 <input
                   type="file"
                   id="avatar-upload"
-                  ref={avatarInputRef}
                   accept="image/jpeg,image/jpg,image/png,image/webp"
-                  className="hidden"
+                  className="sr-only"
+                  onClick={(event) => {
+                    event.currentTarget.value = "";
+                  }}
                   onChange={handleAvatarChange}
                   disabled={isUploadingAvatar}
                 />
@@ -1176,7 +1358,7 @@ export default function PerfilPage() {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Meu Portfólio</h3>
                     {isMusician && (
-                      <Button onClick={() => setShowUploadModal(true)}>
+                      <Button onClick={openUploadModal}>
                         <Upload className="h-4 w-4 mr-2" />
                         Adicionar Mídia
                       </Button>
@@ -1219,7 +1401,7 @@ export default function PerfilPage() {
                       <p className="text-sm text-muted-foreground mb-4">
                         Adicione fotos, vídeos ou áudios das suas apresentações
                       </p>
-                      <Button onClick={() => setShowUploadModal(true)}>
+                      <Button onClick={openUploadModal}>
                         <Upload className="h-4 w-4 mr-2" />
                         Adicionar Primeiro Item
                       </Button>
@@ -1227,59 +1409,93 @@ export default function PerfilPage() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {portfolioItems.map((item) => (
-                        <div key={item.id} className="bg-muted/50 rounded-lg overflow-hidden group relative">
-                          {/* Preview */}
-                          <div className="aspect-video bg-muted flex items-center justify-center relative">
-                            {item.type === 'IMAGE' ? (
-                              <Image
-                                src={item.url}
-                                alt={item.title}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                {getMediaIcon(item.type)}
-                                <span className="text-xs">{item.type}</span>
+                        <div key={item.id} className="bg-muted/50 rounded-lg overflow-hidden group relative border border-border/60">
+                          <button
+                            type="button"
+                            onClick={() => setPortfolioItemToDelete(item)}
+                            className="absolute top-2 right-2 z-10 p-1.5 bg-destructive text-destructive-foreground rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Remover item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setPortfolioPreviewItem(item)}
+                            className="block w-full text-left"
+                          >
+                            <div className="aspect-video bg-muted flex items-center justify-center relative overflow-hidden">
+                              {item.type === "IMAGE" ? (
+                                <Image
+                                  src={item.url}
+                                  alt={item.title}
+                                  fill
+                                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                />
+                              ) : item.type === "VIDEO" ? (
+                                <>
+                                  <video
+                                    src={item.url}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    className="h-full w-full object-cover"
+                                  >
+                                    Seu navegador não suporta a reprodução de vídeo.
+                                  </video>
+                                  <div className="absolute inset-0 bg-black/25" />
+                                </>
+                              ) : (
+                                <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-muted to-muted/60 text-muted-foreground">
+                                  <div className="rounded-full bg-background/80 p-3 text-foreground shadow-sm">
+                                    {getMediaIcon(item.type)}
+                                  </div>
+                                  <span className="text-xs font-medium uppercase tracking-[0.18em]">
+                                    Áudio
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/70 via-black/10 to-transparent p-3 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                <span className="inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 text-xs font-medium backdrop-blur-sm">
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Ver mídia
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium backdrop-blur-sm">
+                                  {getMediaIcon(item.type)}
+                                  {item.type === "IMAGE" ? "Foto" : item.type === "VIDEO" ? "Vídeo" : "Áudio"}
+                                </span>
                               </div>
-                            )}
-                            {/* Delete button */}
-                            <button
-                              onClick={() => handleDeletePortfolioItem(item.id)}
-                              className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                              aria-label="Remover item"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                          {/* Info */}
-                          <div className="p-3 space-y-1">
-                            <h4 className="font-medium text-sm truncate">{item.title}</h4>
-                            {item.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {item.description}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              {item.genre && (
-                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
-                                  {item.genre}
-                                </span>
-                              )}
-                              {item.location && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {item.location}
-                                </span>
-                              )}
-                              {item.date && (
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {new Date(item.date).toLocaleDateString('pt-BR')}
-                                </span>
-                              )}
                             </div>
-                          </div>
+
+                            <div className="p-3 space-y-2">
+                              <h4 className="font-medium text-sm truncate">{item.title}</h4>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {item.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                {item.genre && (
+                                  <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
+                                    {item.genre}
+                                  </span>
+                                )}
+                                {item.location && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {item.location}
+                                  </span>
+                                )}
+                                {item.date && (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatPortfolioDate(item.date)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1288,149 +1504,403 @@ export default function PerfilPage() {
 
                 {/* Upload Modal */}
                 {showUploadModal && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-card rounded-lg max-w-md w-full p-6 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">Adicionar ao Portfólio</h3>
-                        <button
-                          onClick={() => {
-                            setShowUploadModal(false);
-                            setUploadForm({
-                              title: "",
-                              description: "",
-                              date: "",
-                              location: "",
-                              genre: "",
-                            });
-                          }}
-                          className="text-muted-foreground hover:text-foreground"
-                          disabled={isUploadingPortfolio}
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
+                  <div
+                    className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+                    onClick={closeUploadModal}
+                  >
+                    <div
+                      className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 bg-card shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-5xl sm:rounded-[28px] sm:border"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="border-b bg-muted/20 px-4 py-4 sm:px-8 sm:py-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-3">
+                            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                              <Upload className="h-3.5 w-3.5" />
+                              Novo item do portfólio
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-semibold tracking-tight sm:text-2xl">Adicionar ao Portfólio</h3>
+                              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                                Escolha a mídia, preencha os detalhes e confirme o envio.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={closeUploadModal}
+                            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                            disabled={isUploadingPortfolio}
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label htmlFor="portfolio-title" className="text-sm font-medium">
-                            Título *
-                          </label>
-                          <Input
-                            id="portfolio-title"
-                            value={uploadForm.title}
-                            onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                            placeholder="Ex: Show no Teatro Municipal"
-                            disabled={isUploadingPortfolio}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="portfolio-description" className="text-sm font-medium">
-                            Descrição
-                          </label>
-                          <Textarea
-                            id="portfolio-description"
-                            value={uploadForm.description}
-                            onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                            placeholder="Descreva brevemente..."
-                            rows={3}
-                            disabled={isUploadingPortfolio}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label htmlFor="portfolio-genre" className="text-sm font-medium">
-                              Gênero
-                            </label>
-                            <Input
-                              id="portfolio-genre"
-                              value={uploadForm.genre}
-                              onChange={(e) => setUploadForm({ ...uploadForm, genre: e.target.value })}
-                              placeholder="Ex: Jazz"
-                              disabled={isUploadingPortfolio}
+                      <div className="grid flex-1 gap-4 overflow-y-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:p-8">
+                        <div className="space-y-4">
+                          <div
+                            className={`rounded-[24px] border-2 border-dashed p-4 transition-colors sm:p-5 ${
+                              isDraggingPortfolioFile
+                                ? "border-primary bg-primary/5"
+                                : "border-border bg-muted/15"
+                            }`}
+                            onDrop={handlePortfolioFileDrop}
+                            onDragOver={handlePortfolioFileDragOver}
+                            onDragLeave={handlePortfolioFileDragLeave}
+                          >
+                            <input
+                              type="file"
+                              id="portfolio-file"
+                              ref={portfolioInputRef}
+                              accept={canUploadVideoAudio ? PORTFOLIO_MEDIA_ACCEPT : PORTFOLIO_IMAGE_ACCEPT}
+                              onClick={(event) => {
+                                event.currentTarget.value = "";
+                              }}
+                              onChange={handlePortfolioFileChange}
+                              disabled={isPortfolioFileSelectionDisabled}
+                              className="sr-only"
                             />
+
+                            <div className="mb-4 flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                  Etapa 1
+                                </p>
+                                <h4 className="mt-1 text-base font-semibold">Escolha a mídia</h4>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Arraste o arquivo para esta área ou selecione manualmente.
+                                </p>
+                              </div>
+                              <div className="rounded-full bg-primary/10 p-3 text-primary">
+                                <Upload className="h-5 w-5" />
+                              </div>
+                            </div>
+
+                            {selectedPortfolioFile ? (
+                              <div className="space-y-4">
+                                {selectedPortfolioPreviewUrl && selectedPortfolioFile.type.startsWith("image/") ? (
+                                  <div className="overflow-hidden rounded-2xl border bg-black">
+                                    <div
+                                      className="aspect-[4/3] bg-contain bg-center bg-no-repeat"
+                                      style={{ backgroundImage: `url(${selectedPortfolioPreviewUrl})` }}
+                                    />
+                                  </div>
+                                ) : selectedPortfolioPreviewUrl && selectedPortfolioFile.type.startsWith("video/") ? (
+                                  <div className="overflow-hidden rounded-2xl border bg-black">
+                                    <video
+                                      src={selectedPortfolioPreviewUrl}
+                                      muted
+                                      playsInline
+                                      preload="metadata"
+                                      className="aspect-[4/3] w-full object-cover"
+                                    >
+                                      Seu navegador não suporta a reprodução de vídeo.
+                                    </video>
+                                  </div>
+                                ) : (
+                                  <div className="rounded-2xl border bg-background px-5 py-6">
+                                    <div className="flex items-center gap-3">
+                                      <div className="rounded-full bg-primary/10 p-3 text-primary">
+                                        <FileAudio className="h-5 w-5" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Arquivo de áudio selecionado</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          O áudio será publicado com o título que você informar.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="rounded-2xl border bg-background px-4 py-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold">
+                                        {selectedPortfolioFile.name}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {getPortfolioFileKindLabel(selectedPortfolioFile)} • {formatFileSize(selectedPortfolioFile.size)}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={clearSelectedPortfolioFile}
+                                      disabled={isUploadingPortfolio}
+                                    >
+                                      Remover
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-2xl border bg-background/80 px-4 py-8 text-center sm:px-6 sm:py-10">
+                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                  <Upload className="h-7 w-7" />
+                                </div>
+                                <p className="text-base font-semibold sm:text-lg">Selecione seu arquivo</p>
+                                <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+                                  Fotos, vídeos e áudios das suas apresentações para exibir no perfil.
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="mt-5 flex flex-wrap gap-2">
+                              <label
+                                htmlFor="portfolio-file"
+                                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                                  isPortfolioFileSelectionDisabled
+                                    ? "cursor-not-allowed bg-muted text-muted-foreground"
+                                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                                }`}
+                              >
+                                <Upload className="h-4 w-4" />
+                                {selectedPortfolioFile ? "Trocar arquivo" : "Selecionar arquivo"}
+                              </label>
+                              {selectedPortfolioFile && (
+                                <p className="self-center text-xs text-muted-foreground">
+                                  O título precisa ser preenchido manualmente.
+                                </p>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="space-y-1">
-                            <label htmlFor="portfolio-date" className="text-sm font-medium">
-                              Data
-                            </label>
-                            <Input
-                              id="portfolio-date"
-                              type="date"
-                              value={uploadForm.date}
-                              onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
-                              disabled={isUploadingPortfolio}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="portfolio-location" className="text-sm font-medium">
-                            Local
-                          </label>
-                          <Input
-                            id="portfolio-location"
-                            value={uploadForm.location}
-                            onChange={(e) => setUploadForm({ ...uploadForm, location: e.target.value })}
-                            placeholder="Ex: São Paulo, SP"
-                            disabled={isUploadingPortfolio}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label htmlFor="portfolio-file" className="text-sm font-medium">
-                            Arquivo *
-                          </label>
-                          {canUploadVideoAudio ? (
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Imagens (5MB), Vídeos (50MB) ou Áudios (10MB)
-                            </p>
-                          ) : (
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Apenas imagens (JPEG, PNG, WebP — até 5MB).{" "}
+                          {!canUploadVideoAudio && (
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                              Apenas imagens estão liberadas no plano atual.{" "}
                               {!canUploadPhoto && (
-                                <span className="text-destructive font-medium">
-                                  Limite de {maxPhotosLimit} fotos atingido.
+                                <span className="font-semibold">
+                                  Limite de {maxPhotosLimit} fotos atingido.{" "}
                                 </span>
                               )}
-                              {canUploadPhoto && (
-                                <span>
-                                  Restam {maxPhotosLimit - photosCount} foto(s).
-                                </span>
-                              )}
-                              {" "}
-                              <Link href="/planos" className="text-primary underline">
+                              <Link href="/planos" className="font-medium underline">
                                 Upgrade para vídeos e áudios
                               </Link>
-                            </p>
+                            </div>
                           )}
-                          <input
-                            type="file"
-                            id="portfolio-file"
-                            accept={canUploadVideoAudio
-                              ? "image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg"
-                              : "image/jpeg,image/jpg,image/png,image/webp"
-                            }
-                            onChange={handlePortfolioFileChange}
-                            disabled={isUploadingPortfolio || (!canUploadPhoto && !canUploadVideoAudio)}
-                            className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 disabled:opacity-50"
-                          />
+
+                          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
+                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
+                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
+                                <ImageIcon className="h-4 w-4" />
+                              </div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Fotos
+                              </p>
+                              <p className="mt-1 text-sm font-medium">JPG, PNG, WebP</p>
+                              <p className="text-xs text-muted-foreground">Até 5MB</p>
+                            </div>
+                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
+                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
+                                <Video className="h-4 w-4" />
+                              </div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Vídeos
+                              </p>
+                              <p className="mt-1 text-sm font-medium">MP4, WebM, MOV</p>
+                              <p className="text-xs text-muted-foreground">Até 50MB</p>
+                            </div>
+                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
+                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
+                                <FileAudio className="h-4 w-4" />
+                              </div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Áudios
+                              </p>
+                              <p className="mt-1 text-sm font-medium">MP3, WAV, OGG</p>
+                              <p className="text-xs text-muted-foreground">Até 10MB</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="rounded-[24px] border bg-background p-4 sm:p-6">
+                            <div className="mb-5">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Etapa 2
+                              </p>
+                              <h4 className="mt-1 text-base font-semibold">Informações que aparecem no card</h4>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                O título é obrigatório. Os outros campos ajudam a contextualizar a mídia.
+                              </p>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="space-y-1.5">
+                                <label htmlFor="portfolio-title" className="text-sm font-medium">
+                                  Título *
+                                </label>
+                                <Input
+                                  id="portfolio-title"
+                                  value={uploadForm.title}
+                                  onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                                  placeholder="Ex: Show no Teatro Municipal"
+                                  disabled={isUploadingPortfolio}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Este texto será exibido no seu portfólio.
+                                </p>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label htmlFor="portfolio-description" className="text-sm font-medium">
+                                  Descrição
+                                </label>
+                                <Textarea
+                                  id="portfolio-description"
+                                  value={uploadForm.description}
+                                  onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                                  placeholder="Descreva brevemente o contexto dessa apresentação"
+                                  rows={4}
+                                  disabled={isUploadingPortfolio}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <label htmlFor="portfolio-genre" className="text-sm font-medium">
+                                    Gênero
+                                  </label>
+                                  <Input
+                                    id="portfolio-genre"
+                                    value={uploadForm.genre}
+                                    onChange={(e) => setUploadForm({ ...uploadForm, genre: e.target.value })}
+                                    placeholder="Ex: Jazz"
+                                    disabled={isUploadingPortfolio}
+                                  />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <label htmlFor="portfolio-date" className="text-sm font-medium">
+                                    Data
+                                  </label>
+                                  <Input
+                                    id="portfolio-date"
+                                    type="date"
+                                    value={uploadForm.date}
+                                    onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
+                                    disabled={isUploadingPortfolio}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label htmlFor="portfolio-location" className="text-sm font-medium">
+                                  Local
+                                </label>
+                                <Input
+                                  id="portfolio-location"
+                                  value={uploadForm.location}
+                                  onChange={(e) => setUploadForm({ ...uploadForm, location: e.target.value })}
+                                  placeholder="Ex: São Paulo, SP"
+                                  disabled={isUploadingPortfolio}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {selectedPortfolioFile && !uploadForm.title.trim() && (
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                              Agora defina um título para liberar o envio.
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {isUploadingPortfolio && (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                          <span className="ml-2 text-sm text-muted-foreground">
-                            Fazendo upload...
-                          </span>
+                      <div className="border-t bg-background/95 px-4 py-3 backdrop-blur sm:px-8 sm:py-4">
+                        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closeUploadModal}
+                            disabled={isUploadingPortfolio}
+                            className="w-full sm:w-auto"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleSubmitPortfolioUpload}
+                            disabled={isUploadingPortfolio || !selectedPortfolioFile || !uploadForm.title.trim()}
+                            className="w-full sm:w-auto"
+                          >
+                            {isUploadingPortfolio ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Enviando...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4" />
+                                Enviar para o portfólio
+                              </>
+                            )}
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}
+
+                <PortfolioMediaDialog
+                  item={
+                    isAvatarPreviewOpen && avatarDisplayUrl
+                      ? {
+                          url: avatarDisplayUrl,
+                          type: "IMAGE",
+                          title: profileDisplayName,
+                          description: "Foto atual do seu perfil.",
+                        }
+                      : null
+                  }
+                  onClose={() => setIsAvatarPreviewOpen(false)}
+                />
+
+                <PortfolioMediaDialog
+                  item={portfolioPreviewItem}
+                  onClose={() => setPortfolioPreviewItem(null)}
+                />
+
+                <AlertDialog
+                  open={!!portfolioItemToDelete}
+                  onOpenChange={(open) => {
+                    if (!open && !isDeletingPortfolioItem) {
+                      setPortfolioItemToDelete(null);
+                    }
+                  }}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remover mídia do portfólio?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {portfolioItemToDelete?.title
+                          ? `A mídia "${portfolioItemToDelete.title}" será removida permanentemente do seu portfólio.`
+                          : "Esta mídia será removida permanentemente do seu portfólio."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDeletingPortfolioItem}>
+                        Voltar
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => void handleDeletePortfolioItem()}
+                        disabled={isDeletingPortfolioItem}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isDeletingPortfolioItem ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Removendo...
+                          </>
+                        ) : (
+                          "Sim, remover"
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
             {activeTab === "avaliacoes" && (

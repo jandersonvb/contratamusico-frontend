@@ -94,6 +94,7 @@ export async function fetchUserDataFromApi(): Promise<User> {
 
   const response = await fetch(`${API_URL}/users/me`, {
     method: 'GET',
+    cache: 'no-store',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

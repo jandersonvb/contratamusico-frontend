@@ -1,4 +1,5 @@
 import { PortfolioItem, CreatePortfolioData, UpdatePortfolioData } from "@/lib/types/portfolio";
+import { normalizePortfolioUploadFile } from "@/lib/portfolioUpload";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -16,33 +17,22 @@ export async function uploadPortfolioFile(
     throw new Error('Token não encontrado');
   }
 
-  // Validações client-side
-  const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  const videoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-  const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg'];
-  const allAllowedTypes = [...imageTypes, ...videoTypes, ...audioTypes];
+  const normalizedUpload = normalizePortfolioUploadFile(file);
 
-  if (!allAllowedTypes.includes(file.type)) {
+  if (!normalizedUpload) {
     throw new Error('Tipo de arquivo não permitido. Use imagens (JPEG, PNG, WebP), vídeos (MP4, WebM, QuickTime) ou áudios (MP3, WAV, OGG)');
   }
 
-  // Validar tamanho baseado no tipo
-  let maxSize: number;
-  if (imageTypes.includes(file.type)) {
-    maxSize = 5 * 1024 * 1024; // 5MB
-  } else if (videoTypes.includes(file.type)) {
-    maxSize = 50 * 1024 * 1024; // 50MB
-  } else {
-    maxSize = 10 * 1024 * 1024; // 10MB
-  }
+  const { file: normalizedFile, rule } = normalizedUpload;
+  const maxSize = rule.maxSize;
 
-  if (file.size > maxSize) {
+  if (normalizedFile.size > maxSize) {
     const maxSizeMB = maxSize / 1024 / 1024;
     throw new Error(`Arquivo muito grande. Tamanho máximo: ${maxSizeMB}MB`);
   }
 
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', normalizedFile);
   formData.append('title', data.title);
 
   if (data.description) formData.append('description', data.description);
