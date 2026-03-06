@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Loader2, XCircle } from "lucide-react";
 import { getMySubscription } from "@/api/payment";
 import type { SubscriptionResponse } from "@/api/payment";
+import { detectBillingInterval, formatCentsToBrl, getSubscriptionPlanPrice } from "@/lib/subscription";
 
 /**
  * Componente interno que usa useSearchParams
@@ -81,6 +82,14 @@ function PaymentSuccessContent() {
 
   const { subscription: sub } = subscription;
 
+  if (!sub) {
+    return null;
+  }
+
+  const billingInterval = detectBillingInterval(sub.currentPeriodStart, sub.currentPeriodEnd);
+  const planPrice = getSubscriptionPlanPrice(sub.plan, billingInterval);
+  const billingSuffix = billingInterval === "yearly" ? "/ano" : "/mês";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <div className="container max-w-2xl mx-auto px-4 py-12">
@@ -123,7 +132,7 @@ function PaymentSuccessContent() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Valor:</span>
                   <span className="font-medium">
-                    R$ {(sub.plan.monthlyPrice / 100).toFixed(2)}/mês
+                    R$ {formatCentsToBrl(planPrice)}{billingSuffix}
                   </span>
                 </div>
 
