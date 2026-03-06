@@ -45,6 +45,7 @@ import { uploadPortfolioFile, getMyPortfolio, deletePortfolioItem } from "@/api/
 import type { PortfolioItem } from "@/lib/types/portfolio";
 import { useGenreStore } from "@/lib/stores/genreStore";
 import { useInstrumentStore } from "@/lib/stores/instrumentStore";
+import { detectBillingInterval, formatCentsToBrl, getSubscriptionPlanPrice } from "@/lib/subscription";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,6 +158,14 @@ export default function PerfilPage() {
   });
 
   const currentPlan = subscriptionData?.subscription?.plan;
+  const subscription = subscriptionData?.subscription;
+  const subscriptionBillingInterval = subscription
+    ? detectBillingInterval(subscription.currentPeriodStart, subscription.currentPeriodEnd)
+    : "monthly";
+  const subscriptionPlanPrice = subscription
+    ? getSubscriptionPlanPrice(subscription.plan, subscriptionBillingInterval)
+    : 0;
+  const subscriptionPriceLabel = subscriptionBillingInterval === "yearly" ? "Valor Anual" : "Valor Mensal";
 
   // Limites (se maxPhotos for null, é ilimitado)
   const maxPhotosLimit = currentPlan?.maxPhotos ?? 3; // Fallback para 3 se não carregar
@@ -1641,9 +1650,9 @@ export default function PerfilPage() {
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Valor Mensal</span>
+                          <span className="text-sm text-muted-foreground">{subscriptionPriceLabel}</span>
                           <span className="font-semibold">
-                            R$ {((subscriptionData.subscription?.plan.monthlyPrice || 0) / 100).toFixed(2)}
+                            R$ {formatCentsToBrl(subscriptionPlanPrice)}
                           </span>
                         </div>
 
