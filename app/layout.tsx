@@ -11,12 +11,13 @@ import GoogleTagManager from "./components/analytics/GoogleTagManager";
 import MicrosoftClarity from "./components/analytics/MicrosoftClarity";
 import AnalyticsEnvCheck from "./components/analytics/AnalyticsEnvCheck";
 import { UtmTracker } from "./components/analytics/UtmTracker";
+import { getSiteUrl } from "@/lib/env";
 
 import { Toaster } from "sonner";
 
 
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://contratamusico.com.br";
+const siteUrl = getSiteUrl();
 const gtmId = process.env.NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID;
 const clarityProjectId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 
@@ -102,9 +103,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  alternates: {
-    canonical: "./",
   },
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "78iEsEjnf1W9mQAAp_AehgJj_qghDXctMF23nObHhqM",

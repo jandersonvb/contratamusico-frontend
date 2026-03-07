@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchPublicClientById } from "@/api/user";
 import ClientDetailClient from "./ClientDetailClient";
+import { buildPageMetadata } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -12,22 +13,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const numericId = Number(id);
 
   if (!id || Number.isNaN(numericId) || numericId <= 0) {
-    return { title: "Contratante não encontrado" };
+    return {
+      title: "Contratante não encontrado",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
   }
 
   try {
     const client = await fetchPublicClientById(numericId);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://contratamusico.com.br";
 
-    return {
+    return buildPageMetadata({
       title: `${client.name} - Contratante`,
       description: `Perfil público de ${client.name}. Localização: ${client.location || "não informada"}.`,
-      alternates: {
-        canonical: `${siteUrl}/cliente/${client.id}`,
+      path: `/cliente/${client.id}`,
+    });
+  } catch {
+    return {
+      title: "Contratante não encontrado",
+      robots: {
+        index: false,
+        follow: false,
       },
     };
-  } catch {
-    return { title: "Contratante não encontrado" };
   }
 }
 

@@ -1,7 +1,8 @@
 import { MusicianListItem, MusicianProfile } from '@/lib/types/musician';
 import { PaginatedSearchResponse, SearchMusiciansParams, SearchResultItem } from '@/lib/types/search';
+import { getApiBaseUrl } from '@/lib/env';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = getApiBaseUrl();
 
 /**
  * Converte os parâmetros de busca para query string

@@ -1,6 +1,7 @@
 import { Instrument } from '@/lib/types/instrument';
+import { getApiBaseUrl } from '@/lib/env';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = getApiBaseUrl();
 
 /**
  * Busca todos os instrumentos cadastrados
@@ -15,4 +16,3 @@ export async function fetchInstruments(): Promise<Instrument[]> {
 
   return response.json();
 }
-

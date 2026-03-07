@@ -2,8 +2,9 @@
 
 import Script from 'next/script';
 import { MusicianProfile } from '@/lib/types/musician';
+import { getSiteUrl } from '@/lib/env';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br';
+const siteUrl = getSiteUrl();
 
 interface MusicianSchemaProps {
   musician: MusicianProfile;

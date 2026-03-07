@@ -1,6 +1,7 @@
 import { Genre } from '@/lib/types/genre';
+import { getApiBaseUrl } from '@/lib/env';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = getApiBaseUrl();
 
 /**
  * Busca todos os gêneros musicais cadastrados
@@ -15,4 +16,3 @@ export async function fetchGenres(): Promise<Genre[]> {
 
   return response.json();
 }
-

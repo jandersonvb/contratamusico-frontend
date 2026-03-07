@@ -1,6 +1,7 @@
 import type { StoredUtm } from '@/lib/utm'
+import { getApiBaseUrl } from '@/lib/env'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+const API_URL = getApiBaseUrl()
 
 function getCandidateEndpoints(): string[] {
   const configured = process.env.NEXT_PUBLIC_UTM_API_PATH

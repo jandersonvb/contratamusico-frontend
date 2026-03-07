@@ -1,7 +1,8 @@
 import { PortfolioItem, CreatePortfolioData, UpdatePortfolioData } from "@/lib/types/portfolio";
 import { normalizePortfolioUploadFile } from "@/lib/portfolioUpload";
+import { getApiBaseUrl } from "@/lib/env";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = getApiBaseUrl();
 
 /**
  * Upload de arquivo de portfólio (imagem, vídeo ou áudio)

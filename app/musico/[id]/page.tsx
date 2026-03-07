@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { fetchMusicianById } from "@/api/musician";
 import MusicianDetailClient from "./MusicianDetailClient";
 import { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo";
+import { withSiteUrl } from "@/lib/env";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -19,8 +21,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   try {
     const musician = await fetchMusicianById(numericId);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br';
-    const musicianUrl = `${siteUrl}/musico/${musician.id}`;
+    const musicianUrl = withSiteUrl(`/musico/${musician.id}`);
     
     const genresText = musician.genres?.map(g => g.name).join(", ") || "";
     const instrumentsText = musician.instruments?.map(i => i.name).join(", ") || "";
@@ -30,16 +31,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       || `Contrate ${musician.name}, músico profissional especializado em ${genresText}. ${instrumentsText} ${locationText}. Veja portfólio, avaliações e contrate agora.`;
 
     return {
-      title: `${musician.name} - Músico Profissional`,
-      description: description.slice(0, 160),
-      keywords: [
-        musician.name,
-        ...(musician.genres?.map(g => g.name) || []),
-        ...(musician.instruments?.map(i => i.name) || []),
-        "músico profissional",
-        "contratar músico",
-        musician.location || "",
-      ].filter(Boolean),
+      ...buildPageMetadata({
+        title: `${musician.name} - Músico Profissional`,
+        description: description.slice(0, 160),
+        path: `/musico/${musician.id}`,
+        keywords: [
+          musician.name,
+          ...(musician.genres?.map((genre) => genre.name) || []),
+          ...(musician.instruments?.map((instrument) => instrument.name) || []),
+          "músico profissional",
+          "contratar músico",
+          musician.location || "",
+        ].filter(Boolean),
+        type: "profile",
+        image: musician.profileImageUrl || "/images/default-musician.svg",
+      }),
       openGraph: {
         type: "profile",
         url: musicianUrl,
@@ -47,7 +53,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         description: description.slice(0, 200),
         images: [
           {
-            url: musician.profileImageUrl || `${siteUrl}/images/default-musician.svg`,
+            url: musician.profileImageUrl || withSiteUrl("/images/default-musician.svg"),
             width: 800,
             height: 600,
             alt: musician.name,
@@ -58,14 +64,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         card: "summary_large_image",
         title: `${musician.name} - Músico Profissional`,
         description: description.slice(0, 200),
-        images: [musician.profileImageUrl || `${siteUrl}/images/default-musician.svg`],
-      },
-      alternates: {
-        canonical: musicianUrl,
-      },
-      robots: {
-        index: true,
-        follow: true,
+        images: [musician.profileImageUrl || withSiteUrl("/images/default-musician.svg")],
       },
     };
   } catch {

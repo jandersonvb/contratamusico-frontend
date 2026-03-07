@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from "@/lib/env";
+
+const API_URL = getApiBaseUrl();
 
 export interface PlanFeature {
   id: number;
@@ -64,4 +66,3 @@ export async function getPlanById(id: number): Promise<Plan> {
 
   return response.json();
 }
-

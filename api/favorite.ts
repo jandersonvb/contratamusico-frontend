@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from "@/lib/env";
+
+const API_URL = getApiBaseUrl();
 
 /**
  * Dados do músico dentro de um favorito (formato retornado pelo backend)
@@ -166,4 +168,3 @@ export async function getFavoritesCount(): Promise<number> {
     return 0;
   }
 }
-

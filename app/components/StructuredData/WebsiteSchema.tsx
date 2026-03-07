@@ -1,8 +1,9 @@
 'use client';
 
 import Script from 'next/script';
+import { getSiteUrl } from '@/lib/env';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br';
+const siteUrl = getSiteUrl();
 
 export function WebsiteSchema() {
   const schema = {
