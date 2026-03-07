@@ -6,8 +6,9 @@ import {
   SocialLoginCredentials,
 } from '../lib/types/user';
 import { normalizeUserPayload } from '@/lib/utils/userNormalizer';
+import { getApiBaseUrl } from '@/lib/env';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = getApiBaseUrl();
 
 export async function loginRequest(credentials: LoginCredentials): Promise<AuthResponse> {
   try {

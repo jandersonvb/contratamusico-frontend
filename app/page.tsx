@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import { Categories } from "./components/Categories/Categories";
 import { FeaturedMusicians } from "./components/FeaturedMusicians/FeaturedMusicians";
 import { Hero } from "./components/Hero/Hero";
 import { Steps } from "./components/Steps/Steps";
 import { Testimonials } from "./components/Testimonials/Testimonials";
+import { getSiteUrl } from "@/lib/env";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: getSiteUrl(),
+  },
+};
 
 export default function Home() {
   return (

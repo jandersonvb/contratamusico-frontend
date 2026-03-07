@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "dev:https": "next dev --experimental-https --port 3001",
-    "prebuild": "node scripts/generate-sitemaps.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

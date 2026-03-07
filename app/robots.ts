@@ -1,25 +1,23 @@
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/env";
 
 export default function robots(): MetadataRoute.Robots {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://contratamusico.com.br'
-  
+  const siteUrl = getSiteUrl();
+
   return {
     rules: {
-      userAgent: '*',
-      allow: '/',
+      userAgent: "*",
+      allow: "/",
       disallow: [
-        '/api/',
-        '/dashboard',
-        '/perfil',
-        '/perfil/pagamentos',
-        '/mensagens',
-        '/favoritos',
-        '/login',
-        '/cadastro',
-        '/esqueci-senha',
-        '/pagamento/sucesso',
+        "/api/",
+        "/admin",
+        "/dashboard",
+        "/perfil",
+        "/mensagens",
+        "/favoritos",
+        "/pagamento/sucesso",
       ],
     },
     sitemap: `${siteUrl}/sitemap-index.xml`,
-  }
+  };
 }

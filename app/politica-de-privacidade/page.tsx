@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Política de Privacidade | Contrata Músico",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Política de Privacidade",
   description:
     "Entenda quais dados coletamos, para que usamos, com quem compartilhamos e quais são seus direitos na plataforma Contrata Músico.",
-};
+  path: "/politica-de-privacidade",
+});
 
 export default function PoliticaPrivacidadePage() {
   return (
