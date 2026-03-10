@@ -766,7 +766,7 @@ function SearchPageContent() {
         </section>
 
         {isAdvancedFiltersOpen && (
-          <div className="fixed inset-0 z-50">
+          <div className="fixed inset-0 z-40">
             <div
               className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
               onClick={() => setIsAdvancedFiltersOpen(false)}
