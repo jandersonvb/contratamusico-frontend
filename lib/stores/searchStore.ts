@@ -10,6 +10,7 @@ import {
   getDefaultSortByForUserType,
   isSortAllowedForUserType,
 } from '../types/search';
+import { clearMusicianOnlyFilters } from '@/lib/search/filters';
 
 let activeSearchController: AbortController | null = null;
 let activeSearchRequestId = 0;
@@ -21,17 +22,6 @@ const DEFAULT_PAGINATION = {
   totalPages: 1,
   hasMore: false,
 };
-
-function clearMusicianOnlyFilters(filters: SearchFilters): SearchFilters {
-  return {
-    ...filters,
-    genres: [],
-    instruments: [],
-    priceMin: '',
-    priceMax: '',
-    rating: '',
-  };
-}
 
 function normalizeSortBy(sortBy: SearchSortBy, userType: SearchFilters['userType']): SearchSortBy {
   if (isSortAllowedForUserType(sortBy, userType)) {
@@ -66,7 +56,10 @@ export const useSearchStore = create<SearchState>()(
             let nextFilters: SearchFilters = { ...state.filters, ...newFilters };
 
             if (nextFilters.userType === 'client') {
-              nextFilters = clearMusicianOnlyFilters(nextFilters);
+              nextFilters = {
+                ...clearMusicianOnlyFilters(nextFilters),
+                date: '',
+              };
             }
 
             const userTypeChanged =

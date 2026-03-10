@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { DynamicFAQ } from "./components/DynamicFAQ";
 import { createContact } from "@/api/contact";
+import { FAQSectionShell } from "@/components/faq/FAQSectionShell";
 
 /**
  * Contact page replicating the structure of contato.html. It features
@@ -336,8 +337,14 @@ export default function ContatoPage() {
       {/* FAQ */}
       <section className="bg-muted/50 border-t py-8 sm:py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Perguntas Frequentes</h2>
-          <DynamicFAQ />
+          <FAQSectionShell
+            title="Ainda ficou alguma dúvida?"
+            description="Reunimos as respostas mais importantes para acelerar seu contato e evitar idas e vindas. Se preferir, você ainda pode falar com nosso time pelos canais acima."
+            noteTitle="Atendimento sem rodeios"
+            noteDescription="Este bloco reúne as dúvidas mais recorrentes sobre cadastro, contratação, planos e uso da plataforma."
+          >
+            <DynamicFAQ />
+          </FAQSectionShell>
         </div>
       </section>
       {/* Map */}

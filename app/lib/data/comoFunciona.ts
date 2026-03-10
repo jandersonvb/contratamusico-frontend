@@ -68,9 +68,9 @@ export const howItWorksMusician = [
 
 export const benefits = [
   {
-    title: "Segurança Garantida",
+    title: "Mais confiança na escolha",
     description:
-      "Todos os músicos passam por verificação e você contrata com mais confiança.",
+      "Analise perfil, portfólio e avaliações públicas para contratar com mais contexto.",
     icon: Shield,
   },
   {
@@ -97,21 +97,21 @@ export const faqComoFunciona = [
   {
     question: "Quanto custa para usar a plataforma?",
     answer:
-      "A plataforma é gratuita para usuários. Também oferecemos plano gratuito e planos com recursos adicionais, cada um com características específicas para diferentes necessidades.",
+      "Para contratantes, o uso da plataforma é gratuito. Para músicos, há três opções: Básico grátis, Profissional por R$ 49,90/mês e Premium por R$ 99,90/mês.",
   },
   {
-    question: "Os músicos são verificados?",
+    question: "Posso falar com o músico antes de contratar?",
     answer:
-      "Sim, realizamos uma verificação básica de identidade e incentivamos a verificação completa com envio de documentos e portfólio comprovado.",
+      "Sim. Você pode iniciar uma conversa pelo perfil do músico ou pelos resultados da busca para alinhar repertório, data, local e detalhes do evento antes de fechar.",
   },
   {
-    question: "A plataforma processa pagamentos?",
+    question: "O chat funciona em tempo real?",
     answer:
-      "Não. A negociação e as condições da contratação são combinadas diretamente entre cliente e músico.",
+      "Sim. As mensagens são atualizadas em tempo real, com indicador de digitação e avisos de mensagens não lidas para facilitar o acompanhamento da conversa.",
   },
   {
-    question: "E se o músico cancelar?",
+    question: "Posso enviar arquivos pelo chat?",
     answer:
-      "Em caso de cancelamento por parte do músico, nossa equipe auxilia você na busca por um substituto.",
+      "Sim. O chat permite enviar texto e também anexos de imagem, vídeo e áudio. Se quiser, você ainda pode incluir uma legenda junto com o arquivo.",
   },
 ];

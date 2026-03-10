@@ -6,14 +6,10 @@ import {
   howItWorksClient,
   howItWorksMusician,
 } from "@/app/lib/data/comoFunciona";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FAQAccordionList } from "@/components/faq/FAQAccordionList";
+import { FAQSectionShell } from "@/components/faq/FAQSectionShell";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -116,17 +112,16 @@ export default function ComoFuncionaPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="bg-muted/50 py-10 sm:py-16">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 sm:mb-8 text-center">Perguntas Frequentes</h2>
-          <Accordion type="single" collapsible className="w-full">
-            {faqComoFunciona.map((faq, index) => (
-              <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="text-sm sm:text-base text-left">{faq.question}</AccordionTrigger>
-                <AccordionContent className="text-sm sm:text-base">{faq.answer}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+      <section className="bg-muted/35 py-10 sm:py-16">
+        <div className="container mx-auto px-4">
+          <FAQSectionShell
+            title="Dúvidas comuns antes de começar"
+            description="Separamos as perguntas que mais aparecem quando alguém está conhecendo a plataforma. Assim você entende o fluxo de contratação sem precisar adivinhar nada."
+            noteTitle="Fluxo claro do início ao fim"
+            noteDescription="Cadastro, busca, contratação e segurança explicados de forma objetiva para músicos e contratantes."
+          >
+            <FAQAccordionList items={faqComoFunciona} />
+          </FAQSectionShell>
         </div>
       </section>
 

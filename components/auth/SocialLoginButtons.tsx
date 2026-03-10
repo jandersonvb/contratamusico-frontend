@@ -216,7 +216,7 @@ export function SocialLoginButtons({
     }
 
     if (!userType) {
-      toast.error("Selecione se você é cliente ou músico antes de continuar.");
+      toast.error("Selecione se você é contratante ou músico antes de continuar.");
       return false;
     }
 

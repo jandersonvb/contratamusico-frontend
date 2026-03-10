@@ -32,6 +32,7 @@ import { MusicianCardSkeleton } from "./components/MusicianCardSkeleton";
 import { useSearchController } from "./hooks/useSearchController";
 import { DateFilterCalendar } from "./components/DateFilterCalendar";
 import { SearchSortBy, SearchUserTypeFilter } from "@/lib/types/search";
+import { clearMusicianOnlyFilters, hasMusicianOnlyFilters } from "@/lib/search/filters";
 
 const PRICE_PRESETS = [
   { value: "all", label: "Qualquer preco", min: "", max: "" },
@@ -61,8 +62,12 @@ const SORT_OPTIONS_BY_USER_TYPE: Record<
   client: [{ value: "newest", label: "Mais Recentes", trigger: "Recentes" }],
 };
 
+type SearchToolbarOverlay = "userType" | "state" | "city" | "date" | "price" | "sort";
+
 function SearchPageContent() {
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [openOverlay, setOpenOverlay] = useState<SearchToolbarOverlay | null>(null);
+  const [showMusicianScopeNotice, setShowMusicianScopeNotice] = useState(false);
 
   const {
     filters,
@@ -112,6 +117,45 @@ function SearchPageContent() {
     };
   }, [isAdvancedFiltersOpen]);
 
+  useEffect(() => {
+    if (
+      filters.userType === "client" &&
+      (openOverlay === "price" || openOverlay === "date")
+    ) {
+      setOpenOverlay(null);
+    }
+  }, [filters.userType, openOverlay]);
+
+  useEffect(() => {
+    if (!hasMusicianOnlyFilters(filters) || filters.userType !== "musician") {
+      setShowMusicianScopeNotice(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    if (filters.userType === "all" && hasMusicianOnlyFilters(filters)) {
+      setShowMusicianScopeNotice(true);
+      updateFilters({ userType: "musician" });
+    }
+  }, [filters, updateFilters]);
+
+  const handleOverlayChange = (overlay: SearchToolbarOverlay) => (nextOpen: boolean) => {
+    setOpenOverlay((current) => {
+      if (nextOpen) return overlay;
+      return current === overlay ? null : current;
+    });
+  };
+
+  const handleReturnToAllProfiles = () => {
+    setOpenOverlay(null);
+    setShowMusicianScopeNotice(false);
+    updateFilters(clearMusicianOnlyFilters({ ...filters, userType: "all" }));
+  };
+
+  const handleDismissMusicianScopeNotice = () => {
+    setShowMusicianScopeNotice(false);
+  };
+
   const handleSearchInput = (e: ChangeEvent<HTMLInputElement>) => {
     updateFilters({ search: e.target.value });
   };
@@ -158,14 +202,24 @@ function SearchPageContent() {
   const totalPages = pagination?.totalPages || 1;
   const totalResults = pagination?.total || 0;
   const highlightedGenres = filters.userType === "client" ? [] : genres;
-  const hasMusicianOnlyFilters =
-    filters.genres.length > 0 ||
-    filters.instruments.length > 0 ||
-    Boolean(filters.priceMin) ||
-    Boolean(filters.priceMax) ||
-    Boolean(filters.rating);
-  const shouldShowAllModeFilterWarning =
-    filters.userType === "all" && hasMusicianOnlyFilters;
+  const hasMusicianOnlyFiltersActive = hasMusicianOnlyFilters(filters);
+  const musicianOnlyFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+
+    if (filters.genres.length > 0) labels.push("estilos");
+    if (filters.instruments.length > 0) labels.push("instrumentos");
+    if (filters.priceMin || filters.priceMax) labels.push("preço");
+    if (filters.rating) labels.push("avaliação");
+
+    return labels;
+  }, [
+    filters.genres.length,
+    filters.instruments.length,
+    filters.priceMin,
+    filters.priceMax,
+    filters.rating,
+  ]);
+  const musicianOnlyFilterSummary = musicianOnlyFilterLabels.join(", ");
   const resultLabel =
     filters.userType === "musician"
       ? "músicos"
@@ -207,7 +261,7 @@ function SearchPageContent() {
                   placeholder="Buscar músicos ou contratantes..."
                   value={filters.search}
                   onChange={handleSearchInput}
-                  className="w-full rounded-md border px-3 sm:px-4 py-2 text-sm sm:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="w-full rounded-xl border border-primary/15 bg-white/95 px-4 sm:px-5 py-2.5 text-sm text-foreground shadow-[0_16px_35px_-22px_rgba(15,23,42,0.55)] placeholder:text-muted-foreground/80 transition-all duration-200 hover:border-primary/30 focus:border-primary/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 sm:text-base"
                 />
               </div>
               <Button
@@ -229,12 +283,14 @@ function SearchPageContent() {
         </section>
 
         <section className="container mx-auto px-4 flex-1 py-4 sm:py-8">
-          <div className="sticky top-2 z-20 bg-background/95 backdrop-blur-sm border rounded-xl p-3 sm:p-4 mb-4 shadow-sm">
+          <div className="sticky top-2 z-40 bg-background/95 backdrop-blur-sm border rounded-xl p-3 sm:p-4 mb-4 shadow-sm">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="w-full sm:w-auto sm:min-w-[190px]">
                   <Select
                     value={filters.userType}
+                    open={openOverlay === "userType"}
+                    onOpenChange={handleOverlayChange("userType")}
                     onValueChange={(value) =>
                       updateFilters({ userType: value as SearchUserTypeFilter })
                     }
@@ -257,6 +313,8 @@ function SearchPageContent() {
                 <div className="w-full sm:w-auto sm:min-w-[180px]">
                   <Select
                     value={filters.state || "all"}
+                    open={openOverlay === "state"}
+                    onOpenChange={handleOverlayChange("state")}
                     onValueChange={(value) =>
                       updateFilters({ state: value === "all" ? "" : value, city: "" })
                     }
@@ -283,6 +341,8 @@ function SearchPageContent() {
                 <div className="w-full sm:w-auto sm:min-w-[180px]">
                   <Select
                     value={filters.city || "all"}
+                    open={openOverlay === "city"}
+                    onOpenChange={handleOverlayChange("city")}
                     onValueChange={(value) =>
                       updateFilters({ city: value === "all" ? "" : value })
                     }
@@ -307,17 +367,23 @@ function SearchPageContent() {
                   </Select>
                 </div>
 
-                <div className="w-full sm:w-auto sm:min-w-[170px]">
-                  <DateFilterCalendar
-                    value={filters.date}
-                    onChange={(date) => updateFilters({ date })}
-                  />
-                </div>
+                {filters.userType !== "client" && (
+                  <div className="w-full sm:w-auto sm:min-w-[170px]">
+                    <DateFilterCalendar
+                      value={filters.date}
+                      onChange={(date) => updateFilters({ date })}
+                      open={openOverlay === "date"}
+                      onOpenChange={handleOverlayChange("date")}
+                    />
+                  </div>
+                )}
 
                 {filters.userType !== "client" && (
                   <div className="w-full sm:w-auto sm:min-w-[190px]">
                     <Select
                       value={pricePresetValue}
+                      open={openOverlay === "price"}
+                      onOpenChange={handleOverlayChange("price")}
                       onValueChange={(value) => {
                         const preset = PRICE_PRESETS.find((item) => item.value === value);
                         updateFilters({
@@ -343,7 +409,10 @@ function SearchPageContent() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={applySearch}
+                  onClick={() => {
+                    setOpenOverlay(null);
+                    applySearch();
+                  }}
                   disabled={isLoading}
                   className="sm:ml-auto"
                 >
@@ -352,12 +421,59 @@ function SearchPageContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={clearAllFilters}
+                  onClick={() => {
+                    setOpenOverlay(null);
+                    clearAllFilters();
+                  }}
                   disabled={activeFiltersCount === 0}
                 >
                   Limpar filtros
                 </Button>
               </div>
+
+              {showMusicianScopeNotice &&
+                filters.userType === "musician" &&
+                hasMusicianOnlyFiltersActive && (
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-950">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle
+                          className="mt-0.5 h-4 w-4 shrink-0 text-sky-700"
+                          aria-hidden="true"
+                        />
+                        <div className="space-y-1">
+                          <p className="font-medium">Mostrando apenas músicos</p>
+                          <p className="text-sky-900/80">
+                            Ajustamos a busca para &quot;Somente músicos&quot; porque
+                            você selecionou filtros exclusivos dessa categoria
+                            {musicianOnlyFilterSummary ? `: ${musicianOnlyFilterSummary}.` : "."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 sm:shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 border-sky-200 bg-white text-sky-900 hover:bg-sky-100"
+                          onClick={handleReturnToAllProfiles}
+                        >
+                          Voltar para todos os perfis
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-sky-700 hover:bg-sky-100 hover:text-sky-900"
+                          onClick={handleDismissMusicianScopeNotice}
+                          aria-label="Fechar aviso"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               {highlightedGenres.length > 0 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -389,7 +505,10 @@ function SearchPageContent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setIsAdvancedFiltersOpen(true)}
+                  onClick={() => {
+                    setOpenOverlay(null);
+                    setIsAdvancedFiltersOpen(true);
+                  }}
                   className="h-8 px-2 text-xs sm:text-sm"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
@@ -436,7 +555,12 @@ function SearchPageContent() {
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
-                <Select value={sortBy} onValueChange={changeSort}>
+                <Select
+                  value={sortBy}
+                  open={openOverlay === "sort"}
+                  onOpenChange={handleOverlayChange("sort")}
+                  onValueChange={changeSort}
+                >
                   <SelectTrigger className="flex-1 sm:w-40 text-sm">
                     {selectedSortOption?.trigger || "Ordenar"}
                   </SelectTrigger>
@@ -553,12 +677,6 @@ function SearchPageContent() {
               </button>
             ))}
           </div>
-
-          {shouldShowAllModeFilterWarning && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-              Filtros de músico ativos: contratantes foram ocultados nesta busca.
-            </div>
-          )}
 
           {error && (
             <div

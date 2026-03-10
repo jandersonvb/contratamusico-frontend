@@ -26,7 +26,7 @@ export default function CadastroPage() {
   const router = useRouter();
   const { setUser } = useUserStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userType, setUserType] = useState<"cliente" | "musico">("cliente");
+  const [userType, setUserType] = useState<"cliente" | "musico">("musico");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [form, setForm] = useState({
@@ -223,21 +223,6 @@ export default function CadastroPage() {
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
               <button
                 type="button"
-                onClick={() => setUserType("cliente")}
-                className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
-                  userType === "cliente"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted hover:bg-muted/70"
-                }`}
-              >
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
-                <h3 className="font-medium text-sm sm:text-base">Sou Cliente</h3>
-                <p className="text-[10px] sm:text-xs text-center">
-                  Quero contratar músicos para meus eventos
-                </p>
-              </button>
-              <button
-                type="button"
                 onClick={() => setUserType("musico")}
                 className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
                   userType === "musico"
@@ -249,6 +234,21 @@ export default function CadastroPage() {
                 <h3 className="font-medium text-sm sm:text-base">Sou Músico</h3>
                 <p className="text-[10px] sm:text-xs text-center">
                   Quero oferecer meus serviços musicais
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserType("cliente")}
+                className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
+                  userType === "cliente"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted hover:bg-muted/70"
+                }`}
+              >
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
+                <h3 className="font-medium text-sm sm:text-base">Sou Contratante</h3>
+                <p className="text-[10px] sm:text-xs text-center">
+                  Quero contratar músicos para meus eventos
                 </p>
               </button>
             </div>

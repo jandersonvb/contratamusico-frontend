@@ -4,12 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { planFaq } from "@/lib/plans";
 import { Check, X, Star as StarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +13,8 @@ import { toast } from "sonner";
 import { useUserStore } from "@/lib/stores/userStore";
 import { UserType } from "@/lib/types/user";
 import { useRouter } from "next/navigation";
+import { FAQAccordionList } from "@/components/faq/FAQAccordionList";
+import { FAQSectionShell } from "@/components/faq/FAQSectionShell";
 
 const STATS_FEATURE_REGEX = /estat[ií]stic/i;
 const WHATSAPP_FEATURE_REGEX = /whats ?app/i;
@@ -264,21 +260,14 @@ export default function PlanosPage() {
       {/* FAQ section */}
       <section className="bg-muted/50 border-t py-8 sm:py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-center">
-            Perguntas Frequentes
-          </h2>
-          <Accordion type="multiple" className="max-w-3xl mx-auto space-y-2">
-            {planFaq.map((faq, idx) => (
-              <AccordionItem key={idx} value={`faq-${idx}`}>
-                <AccordionTrigger className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-card hover:bg-muted text-left text-sm sm:text-base">
-                  <span>{faq.question}</span>
-                </AccordionTrigger>
-                <AccordionContent className="p-2 sm:p-3 text-xs sm:text-sm text-muted-foreground">
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          <FAQSectionShell
+            title="Dúvidas comuns sobre os planos"
+            description="Entenda o que muda em cada plano, como funciona a cobrança e o que acontece com sua assinatura no dia a dia."
+            noteTitle="Respostas objetivas"
+            noteDescription="Reunimos aqui as dúvidas mais comuns de quem está escolhendo um plano para melhorar o perfil e ganhar mais visibilidade."
+          >
+            <FAQAccordionList items={planFaq} type="multiple" />
+          </FAQSectionShell>
         </div>
       </section>
       {/* CTA section */}
