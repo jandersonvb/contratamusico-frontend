@@ -148,33 +148,63 @@ export const clientPlans: Plan[] = [
  */
 export const planFaq = [
   {
-    question: "Posso mudar de plano a qualquer momento?",
+    category: "Planos",
+    question: "Quem precisa assinar um plano?",
     answer:
-      "Sim! Você pode fazer upgrade ou downgrade do seu plano a qualquer momento. As mudanças entram em vigor imediatamente e o valor é ajustado proporcionalmente.",
+      "Os planos pagos são para músicos. Contratantes podem usar a plataforma para buscar perfis e falar com músicos sem precisar de assinatura.",
   },
   {
-    question: "Existe período de teste gratuito?",
+    category: "Recursos",
+    question: "O que cada plano libera no meu perfil?",
     answer:
-      "Oferecemos 14 dias de teste gratuito para todos os planos pagos. Você pode cancelar a qualquer momento durante o período de teste sem cobrança.",
+      "Isso depende do plano ativo. Entre os recursos liberados estão mais espaço para fotos e vídeos no portfólio, exibição pública de contatos, estatísticas, selo de verificação e destaque do perfil nos resultados.",
   },
   {
-    question: "Como funciona o pagamento anual?",
+    category: "Pagamento",
+    question: "Posso pagar por mês ou por ano?",
     answer:
-      "No plano anual, você paga 12 meses antecipadamente e recebe um desconto. O valor é cobrado uma vez por ano na data de renovação.",
+      "Sim. Quando essa opção estiver disponível no checkout, você pode escolher cobrança mensal ou anual. No plano anual, a renovação acontece uma vez por ano.",
   },
   {
-    question: "Posso cancelar minha assinatura?",
+    category: "Assinatura",
+    question: "Como cancelar minha assinatura?",
     answer:
-      "Sim, você pode cancelar sua assinatura a qualquer momento. Seu plano permanecerá ativo até o final do período pago e depois será convertido para o plano gratuito.",
+      "Você pode cancelar sua assinatura para que ela termine no fim do período já pago. Até essa data, seu plano continua ativo normalmente.",
   },
   {
-    question: "Há taxa de comissão sobre contratações?",
+    category: "Assinatura",
+    question: "Posso reativar depois de cancelar?",
     answer:
-      "Não cobramos comissão sobre suas contratações. Você paga apenas a mensalidade do plano escolhido e fica com 100% do valor dos seus trabalhos.",
+      "Sim. Se a assinatura ainda estiver dentro do período ativo, você pode reativá-la antes da data final.",
   },
   {
-    question: "Que formas de pagamento vocês aceitam?",
+    category: "Pagamento",
+    question: "Como atualizo meu cartão?",
     answer:
-      "Aceitamos cartões de crédito (Visa, Mastercard, Elo), PIX e boleto bancário. Para planos anuais, também oferecemos desconto adicional no PIX.",
+      "Você pode atualizar seu cartão e cuidar das cobranças pelo portal da sua assinatura.",
+  },
+  {
+    category: "Pagamento",
+    question: "O que acontece se o pagamento não for aprovado?",
+    answer:
+      "Se uma cobrança falhar, sua assinatura pode ficar pendente até a regularização. Quando isso acontece, a plataforma pode avisar você por email.",
+  },
+  {
+    category: "Contratações",
+    question: "A plataforma cobra comissão sobre os eventos?",
+    answer:
+      "Não. A cobrança da plataforma é pela assinatura do músico, e não por comissão em cada contratação.",
+  },
+  {
+    category: "Recursos",
+    question: "O que muda no meu perfil com os planos Profissional e Premium?",
+    answer:
+      "Os planos pagos liberam mais recursos no perfil e ajudam você a ganhar visibilidade. Dependendo do plano, seu perfil pode ter mais destaque, selo de verificação e mais sinais de confiança para quem está contratando.",
+  },
+  {
+    category: "Assinatura",
+    question: "Posso mudar de plano depois?",
+    answer:
+      "Sim, a assinatura pode ser gerenciada pela área de cobrança. As opções de troca dependem do que estiver disponível nesse fluxo no momento da alteração.",
   },
 ];

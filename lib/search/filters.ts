@@ -1,5 +1,26 @@
 import { SearchFilters } from "@/lib/types/search";
 
+export function hasMusicianOnlyFilters(filters: SearchFilters): boolean {
+  return (
+    filters.genres.length > 0 ||
+    filters.instruments.length > 0 ||
+    Boolean(filters.priceMin) ||
+    Boolean(filters.priceMax) ||
+    Boolean(filters.rating)
+  );
+}
+
+export function clearMusicianOnlyFilters(filters: SearchFilters): SearchFilters {
+  return {
+    ...filters,
+    genres: [],
+    instruments: [],
+    priceMin: "",
+    priceMax: "",
+    rating: "",
+  };
+}
+
 export function countActiveFilters(filters: SearchFilters): number {
   let count = 0;
 
@@ -14,4 +35,3 @@ export function countActiveFilters(filters: SearchFilters): number {
 
   return count;
 }
-
