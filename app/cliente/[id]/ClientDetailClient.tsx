@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar, MapPin, MessageCircle, Star } from "lucide-react";
 import type { PublicClientProfile } from "@/lib/types/user";
+import { shouldDisableNextImageOptimization } from "@/lib/utils/imageOptimization";
 
 interface ClientDetailClientProps {
   client: PublicClientProfile;
@@ -45,7 +46,7 @@ export default function ClientDetailClient({ client }: ClientDetailClientProps) 
                 alt={client.name}
                 fill
                 className="object-cover"
-                unoptimized
+                unoptimized={shouldDisableNextImageOptimization(profileImageUrl)}
               />
             </div>
 

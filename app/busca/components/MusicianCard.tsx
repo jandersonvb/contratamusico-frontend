@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useFavoriteStore } from "@/lib/stores/favoriteStore";
 import { useUserStore } from "@/lib/stores/userStore";
 import { toast } from "sonner";
+import { shouldDisableNextImageOptimization } from "@/lib/utils/imageOptimization";
 
 interface MusicianCardProps {
   musician: SearchResultItem;
@@ -135,7 +136,10 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   }, [musician.id]);
 
   const handleImageError = useCallback((index: number) => {
-    setImageErrors((prev) => new Set(prev).add(index));
+    setImageErrors((prev) => {
+      if (prev.has(index)) return prev;
+      return new Set(prev).add(index);
+    });
     setIsLoading(false);
   }, []);
 
@@ -172,6 +176,8 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
   const currentPhotoUrl = imageErrors.has(currentPhotoIndex)
     ? getAvatarUrl(musician.name)
     : photos[currentPhotoIndex];
+  const shouldUnoptimizeCurrentPhoto =
+    shouldDisableNextImageOptimization(currentPhotoUrl);
 
   const ImageCarousel = ({ className }: { className: string }) => (
     <div className={`relative bg-muted overflow-hidden group/carousel ${className}`}>
@@ -185,7 +191,7 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
         className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
         onError={() => handleImageError(currentPhotoIndex)}
         onLoad={handleImageLoad}
-        unoptimized
+        unoptimized={shouldUnoptimizeCurrentPhoto}
       />
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
@@ -283,7 +289,7 @@ export function MusicianCard({ musician, view = "grid" }: MusicianCardProps) {
               alt={`Foto de ${musician.name}`}
               fill
               className="object-cover"
-              unoptimized
+              unoptimized={shouldUnoptimizeCurrentPhoto}
             />
             {isMusician && (
               <Button

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { shouldDisableNextImageOptimization } from "@/lib/utils/imageOptimization";
 
 interface MusicianAvatarProps {
   src: string | null | undefined;
@@ -51,9 +52,7 @@ export function MusicianAvatar({
   
   const hasValidImage = isValidImageUrl(src) && !imageError;
   const imageUrl = hasValidImage ? src! : getAvatarUrl(name, size);
-
-  // Always use unoptimized for external URLs to avoid Next.js optimization issues
-  const shouldUnoptimize = !imageUrl.includes('localhost') && !imageUrl.includes(process.env.NEXT_PUBLIC_SITE_URL || '');
+  const shouldUnoptimize = shouldDisableNextImageOptimization(imageUrl);
 
   const handleError = () => {
     setImageError(true);
