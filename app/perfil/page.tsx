@@ -13,15 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { PortfolioMediaDialog } from "@/components/portfolio/PortfolioMediaDialog";
 
-import { Star, MapPin, Camera, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio, Eye, Image as ImageIcon } from "lucide-react";
+import { Star, MapPin, Loader2, CreditCard, ExternalLink, Calendar, AlertCircle, Upload, Trash2, X, Music, Video, FileAudio, Eye, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -114,7 +108,7 @@ function createEmptyUploadForm() {
  */
 export default function PerfilPage() {
   const router = useRouter();
-  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser } = useUserStore();
+  const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser, setUser } = useUserStore();
   const { genres, fetchGenres } = useGenreStore();
   const { instruments, fetchInstruments } = useInstrumentStore();
 
@@ -157,10 +151,10 @@ export default function PerfilPage() {
 
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState(false);
   const [avatarLocalPreviewUrl, setAvatarLocalPreviewUrl] = useState<string | null>(null);
   const [avatarRemoteUrlBeforeUpload, setAvatarRemoteUrlBeforeUpload] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Portfolio state
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
@@ -274,10 +268,24 @@ export default function PerfilPage() {
       return;
     }
 
+    const normalizeAvatarUrl = (url?: string | null): string | null => {
+      if (!url) return null;
+      try {
+        const parsed = new URL(url);
+        parsed.searchParams.delete("_ts");
+        return parsed.toString();
+      } catch {
+        return url;
+      }
+    };
+
     const currentAvatarUrl = user?.profileImageUrl ?? null;
+    const normalizedCurrentAvatarUrl = normalizeAvatarUrl(currentAvatarUrl);
+    const normalizedAvatarBeforeUpload = normalizeAvatarUrl(avatarRemoteUrlBeforeUpload);
     const hasServerAvatarUpdated =
-      !!currentAvatarUrl &&
-      (avatarRemoteUrlBeforeUpload === null || currentAvatarUrl !== avatarRemoteUrlBeforeUpload);
+      !!normalizedCurrentAvatarUrl &&
+      (normalizedAvatarBeforeUpload === null ||
+        normalizedCurrentAvatarUrl !== normalizedAvatarBeforeUpload);
 
     if (!hasServerAvatarUpdated) {
       return;
@@ -595,19 +603,109 @@ export default function PerfilPage() {
     router.replace(`/perfil?tab=${tab}`, { scroll: false });
   };
 
+  const openAvatarFilePicker = () => {
+    if (isUploadingAvatar) {
+      return;
+    }
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    const input = avatarInputRef.current;
+    if (!input) return;
+
+    input.value = "";
+    input.click();
+  };
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const previousAvatarUrl = user?.profileImageUrl ?? null;
     const localPreviewUrl = URL.createObjectURL(file);
-    setIsAvatarMenuOpen(false);
     setIsAvatarPreviewOpen(false);
     setAvatarLocalPreviewUrl(localPreviewUrl);
-    setAvatarRemoteUrlBeforeUpload(user?.profileImageUrl ?? null);
+    setAvatarRemoteUrlBeforeUpload(previousAvatarUrl);
     setIsUploadingAvatar(true);
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+
+    const normalizeAvatarUrl = (url?: string | null): string | null => {
+      if (!url) return null;
+      try {
+        const parsed = new URL(url);
+        parsed.searchParams.delete("_ts");
+        return parsed.toString();
+      } catch {
+        return url;
+      }
+    };
+
+    const withTransientCacheBust = (url: string): string => {
+      try {
+        const parsed = new URL(url);
+        parsed.searchParams.set("_ts", Date.now().toString());
+        return parsed.toString();
+      } catch {
+        const separator = url.includes("?") ? "&" : "?";
+        return `${url}${separator}_ts=${Date.now()}`;
+      }
+    };
+
+    const syncUserAfterAvatarUpload = async (expectedAvatarUrl?: string | null) => {
+      const expectedNormalized = normalizeAvatarUrl(expectedAvatarUrl);
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        await fetchUser(true).catch(() => undefined);
+
+        const currentAvatarUrl = useUserStore.getState().user?.profileImageUrl ?? null;
+        const currentNormalized = normalizeAvatarUrl(currentAvatarUrl);
+        const hasUpdatedAvatar =
+          !!currentNormalized &&
+          (expectedNormalized === null || currentNormalized !== expectedNormalized);
+
+        if (hasUpdatedAvatar) {
+          return;
+        }
+
+        await wait(350 + attempt * 150);
+      }
+    };
+
     try {
-      await uploadAvatar(file);
-      await fetchUser(true).catch(() => undefined);
+      const uploaded = await uploadAvatar(file);
+
+      // Atualiza imediatamente o estado local para não depender de timing de cache/CDN.
+      if (user) {
+        const uploadedProfileImageUrl =
+          typeof uploaded.profileImageUrl === "string" ? uploaded.profileImageUrl : null;
+        const normalizedUploaded = normalizeAvatarUrl(uploadedProfileImageUrl);
+        const normalizedPrevious = normalizeAvatarUrl(previousAvatarUrl);
+        const nextAvatarUrl =
+          uploadedProfileImageUrl
+            ? normalizedUploaded && normalizedUploaded === normalizedPrevious
+              ? withTransientCacheBust(uploadedProfileImageUrl)
+              : uploadedProfileImageUrl
+            : previousAvatarUrl
+              ? withTransientCacheBust(previousAvatarUrl)
+              : null;
+
+        setUser({
+          ...user,
+          profileImageUrl: nextAvatarUrl ?? undefined,
+          profileImageKey:
+            (typeof uploaded.profileImageKey === "string" && uploaded.profileImageKey) ||
+            nextAvatarUrl ||
+            undefined,
+        });
+      }
+
+      await syncUserAfterAvatarUpload(previousAvatarUrl);
       toast.success("Foto de perfil atualizada com sucesso!");
     } catch (error) {
       setAvatarLocalPreviewUrl(null);
@@ -627,7 +725,6 @@ export default function PerfilPage() {
       return;
     }
 
-    setIsAvatarMenuOpen(false);
     setIsAvatarPreviewOpen(true);
   };
 
@@ -869,90 +966,61 @@ export default function PerfilPage() {
             {/* Profile card */}
             <div className="bg-card border rounded-lg p-6 text-center">
               <div className="relative inline-block mb-4">
-                <DropdownMenu open={isAvatarMenuOpen} onOpenChange={setIsAvatarMenuOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Opções da foto de perfil"
-                      disabled={isUploadingAvatar}
-                      className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : "cursor-pointer"} group`}
-                    >
-                      {isUploadingAvatar && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                          <Loader2 className="h-8 w-8 animate-spin text-white" />
-                        </div>
-                      )}
-
-                      <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/40">
-                        <span className="text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          Ver opções
-                        </span>
-                      </div>
-
-                      {avatarDisplayUrl ? (
-                        <Image
-                          src={avatarDisplayUrl}
-                          alt={profileDisplayName}
-                          width={100}
-                          height={100}
-                          key={avatarDisplayUrl}
-                          unoptimized={avatarDisplayUrl.startsWith("blob:")}
-                          className="rounded-full object-cover h-24 w-24"
-                        />
-                      ) : (
-                        <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-2xl font-semibold text-primary">
-                            {(user.firstName?.[0] || "").toUpperCase()}
-                            {(user.lastName?.[0] || "").toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent align="center" side="bottom" className="w-52">
-                    {avatarDisplayUrl && (
-                      <DropdownMenuItem
-                        className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                        onSelect={handleViewAvatar}
-                      >
-                        <Eye className="h-4 w-4" />
-                        Ver foto do perfil
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem asChild>
-                      <label
-                        htmlFor="avatar-upload"
-                        className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                      >
-                        <Upload className="h-4 w-4" />
-                        Escolher foto do perfil
-                      </label>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <label
-                  htmlFor="avatar-upload"
-                  aria-label="Escolher foto do perfil"
-                  className={`absolute bottom-0 right-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow transition-colors hover:text-primary ${
-                    isUploadingAvatar ? "pointer-events-none opacity-70" : "cursor-pointer"
-                  }`}
+                <button
+                  type="button"
+                  aria-label={avatarDisplayUrl ? "Ver foto do perfil" : "Foto de perfil"}
+                  onClick={avatarDisplayUrl ? handleViewAvatar : undefined}
+                  disabled={isUploadingAvatar}
+                  className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : avatarDisplayUrl ? "cursor-pointer group" : "cursor-default"}`}
                 >
-                  <Camera className="h-4 w-4" />
-                </label>
+                  {isUploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                    </div>
+                  )}
+
+                  {avatarDisplayUrl ? (
+                    <Image
+                      src={avatarDisplayUrl}
+                      alt={profileDisplayName}
+                      width={100}
+                      height={100}
+                      key={avatarDisplayUrl}
+                      unoptimized={avatarDisplayUrl.startsWith("blob:")}
+                      className="rounded-full object-cover h-24 w-24"
+                    />
+                  ) : (
+                    <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-2xl font-semibold text-primary">
+                        {(user.firstName?.[0] || "").toUpperCase()}
+                        {(user.lastName?.[0] || "").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </button>
 
                 <input
+                  ref={avatarInputRef}
                   type="file"
                   id="avatar-upload"
                   accept="image/jpeg,image/jpg,image/png,image/webp"
                   className="sr-only"
-                  onClick={(event) => {
-                    event.currentTarget.value = "";
-                  }}
                   onChange={handleAvatarChange}
                   disabled={isUploadingAvatar}
                 />
+              </div>
+              <div className="mb-4 flex items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  onClick={openAvatarFilePicker}
+                  disabled={isUploadingAvatar}
+                  className="h-8 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm disabled:cursor-not-allowed"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Trocar foto
+                </Button>
               </div>
               <h2 className="text-lg font-semibold">{user.firstName} {user.lastName}</h2>
               {isMusician && musicianProfile?.category && (
