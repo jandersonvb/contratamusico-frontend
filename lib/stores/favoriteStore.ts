@@ -177,21 +177,19 @@ export const useFavoriteStore = create<FavoriteState>()(
       },
 
       clearFavorites: () => {
+        const { lastSeenAt } = get();
+
         set(
           {
             favorites: [],
             favoriteIds: new Set(),
             isLoading: false,
             togglingIds: new Set(),
-            lastSeenAt: 0,
+            lastSeenAt,
           },
           false,
           'favorites/cleared'
         );
-
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(FAVORITES_LAST_SEEN_KEY);
-        }
       },
     }),
     {
