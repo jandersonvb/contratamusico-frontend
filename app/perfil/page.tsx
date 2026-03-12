@@ -45,6 +45,7 @@ import { uploadPortfolioFile, getMyPortfolio, deletePortfolioItem } from "@/api/
 import type { PortfolioItem } from "@/lib/types/portfolio";
 import { useGenreStore } from "@/lib/stores/genreStore";
 import { useInstrumentStore } from "@/lib/stores/instrumentStore";
+import { useLocationStore } from "@/lib/stores/locationStore";
 import { detectBillingInterval, formatCentsToBrl, getSubscriptionPlanPrice } from "@/lib/subscription";
 import {
   AlertDialog,
@@ -63,8 +64,7 @@ type ProfileTab =
   | "info-musicais"
   | "portfolio"
   | "avaliacoes"
-  | "assinatura"
-  | "configuracoes";
+  | "assinatura";
 
 const PROFILE_TABS: ProfileTab[] = [
   "info-pessoais",
@@ -72,12 +72,10 @@ const PROFILE_TABS: ProfileTab[] = [
   "portfolio",
   "avaliacoes",
   "assinatura",
-  "configuracoes",
 ];
 
 const CLIENT_PROFILE_TABS: ProfileTab[] = [
   "info-pessoais",
-  "configuracoes",
 ];
 
 const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
@@ -86,7 +84,6 @@ const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
   portfolio: "Portfólio",
   avaliacoes: "Avaliações",
   assinatura: "Assinatura",
-  configuracoes: "Configurações",
 };
 
 function createEmptyUploadForm() {
@@ -99,18 +96,37 @@ function createEmptyUploadForm() {
   };
 }
 
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 /**
  * Profile page that allows the logged in musician to view and edit their
  * personal and musical information. It also shows a summary card with
- * statistics and provides navigation between different sections. The
- * editing states for each tab are controlled independently and can
- * toggle between read‑only and editable modes.
+ * statistics and provides navigation between different sections.
  */
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoggedIn, isLoading, isUpdating, updateUser, fetchUser, setUser } = useUserStore();
   const { genres, fetchGenres } = useGenreStore();
   const { instruments, fetchInstruments } = useInstrumentStore();
+  const {
+    states,
+    cities,
+    isLoadingCities,
+    fetchStates,
+    fetchCities,
+    clearCities,
+  } = useLocationStore();
 
   // Verificar autenticação
   useEffect(() => {
@@ -145,9 +161,7 @@ export default function PerfilPage() {
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  // Editing states
-  const [editPersonal, setEditPersonal] = useState(false);
-  const [editMusical, setEditMusical] = useState(false);
+  const [isSavingMusical, setIsSavingMusical] = useState(false);
 
   // Avatar upload state
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -161,6 +175,7 @@ export default function PerfilPage() {
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showOptionalPortfolioFields, setShowOptionalPortfolioFields] = useState(false);
   const [uploadForm, setUploadForm] = useState(createEmptyUploadForm);
   const [selectedPortfolioFile, setSelectedPortfolioFile] = useState<File | null>(null);
   const [portfolioPreviewItem, setPortfolioPreviewItem] = useState<PortfolioItem | null>(null);
@@ -231,7 +246,7 @@ export default function PerfilPage() {
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.email || "",
-        phone: user.phone || "",
+        phone: formatPhoneInput(user.phone || ""),
         city: user.city || "",
         state: user.state || "",
       });
@@ -254,6 +269,36 @@ export default function PerfilPage() {
     fetchGenres();
     fetchInstruments();
   }, [isMusician, fetchGenres, fetchInstruments]);
+
+  useEffect(() => {
+    fetchStates();
+  }, [fetchStates]);
+
+  useEffect(() => {
+    if (personalForm.state) {
+      fetchCities(personalForm.state);
+      return;
+    }
+
+    clearCities();
+  }, [personalForm.state, fetchCities, clearCities]);
+
+  useEffect(() => {
+    if (!showUploadModal) {
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [showUploadModal]);
 
   useEffect(() => {
     return () => {
@@ -529,7 +574,50 @@ export default function PerfilPage() {
     field: keyof typeof personalForm,
     value: string
   ) => {
-    setPersonalForm((prev) => ({ ...prev, [field]: value }));
+    setPersonalForm((prev) => ({
+      ...prev,
+      [field]: field === "phone" ? formatPhoneInput(value) : value,
+    }));
+  };
+
+  const resetPersonalForm = () => {
+    if (!user) {
+      return;
+    }
+
+    setPersonalForm({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phone: formatPhoneInput(user.phone || ""),
+      city: user.city || "",
+      state: user.state || "",
+    });
+  };
+
+  const resetMusicalForm = () => {
+    if (!musicianProfile) {
+      setMusicalForm({
+        instruments: [],
+        genres: [],
+        bio: "",
+        experience: "",
+        priceRange: "",
+        equipment: "",
+      });
+      return;
+    }
+
+    setMusicalForm({
+      instruments: musicianProfile.instruments?.map((i) => i.slug) || [],
+      genres: musicianProfile.genres?.map((g) => g.slug) || [],
+      bio: musicianProfile.bio || "",
+      experience: musicianProfile.experience || "",
+      priceRange: musicianProfile.priceFrom
+        ? getPriceRangeFromValue(musicianProfile.priceFrom)
+        : "",
+      equipment: musicianProfile.equipment || "",
+    });
   };
 
   const handleMusicalCheckbox = (
@@ -558,12 +646,11 @@ export default function PerfilPage() {
       await updateUser({
         firstName: personalForm.firstName,
         lastName: personalForm.lastName,
-        phone: personalForm.phone,
+        phone: personalForm.phone.replace(/\D/g, ""),
         city: personalForm.city,
         state: personalForm.state,
       });
       toast.success("Informações pessoais atualizadas!");
-      setEditPersonal(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao atualizar";
       toast.error(message);
@@ -572,6 +659,7 @@ export default function PerfilPage() {
 
   const saveMusicalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingMusical(true);
     try {
       await updateMyMusicianProfile({
         bio: musicalForm.bio || undefined,
@@ -587,10 +675,11 @@ export default function PerfilPage() {
 
       await fetchUser();
       toast.success("Informações musicais atualizadas!");
-      setEditMusical(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao atualizar informações musicais";
       toast.error(message);
+    } finally {
+      setIsSavingMusical(false);
     }
   };
 
@@ -730,6 +819,7 @@ export default function PerfilPage() {
 
   const resetPortfolioUploadForm = () => {
     setUploadForm(createEmptyUploadForm());
+    setShowOptionalPortfolioFields(false);
     setSelectedPortfolioFile(null);
     setSelectedPortfolioPreviewUrl(null);
     setIsDraggingPortfolioFile(false);
@@ -751,6 +841,20 @@ export default function PerfilPage() {
   const openUploadModal = () => {
     resetPortfolioUploadForm();
     setShowUploadModal(true);
+  };
+
+  const openPortfolioFilePicker = () => {
+    if (isPortfolioFileSelectionDisabled) {
+      return;
+    }
+
+    const input = portfolioInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.value = "";
+    input.click();
   };
 
   const clearSelectedPortfolioFile = () => {
@@ -956,72 +1060,39 @@ export default function PerfilPage() {
 
   const profileDisplayName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Perfil";
   const avatarDisplayUrl = avatarLocalPreviewUrl || user.profileImageUrl || undefined;
+  const hasPortfolioUploadFile = !!selectedPortfolioFile;
+  const hasPortfolioTitle = uploadForm.title.trim().length > 0;
+  const isPortfolioUploadReady = hasPortfolioUploadFile && hasPortfolioTitle;
 
   return (
     <div className="min-h-screen flex flex-col">
-      <section className="container mx-auto px-4 py-8 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
+      <section className="container mx-auto flex-1 px-3 py-4 sm:px-4 sm:py-8 [&_button]:cursor-pointer [&_a]:cursor-pointer [&_input:not(:disabled)]:cursor-pointer [&_[role=checkbox]]:cursor-pointer [&_[role=combobox]]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[300px_1fr] lg:gap-8">
           {/* Sidebar */}
-          <aside className="space-y-6">
+          <aside className="space-y-4 self-start sm:space-y-6 lg:sticky lg:top-24">
+            {/* Navigation menu */}
+            <nav className="bg-card border rounded-lg p-3">
+              <p className="hidden px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block">
+                Meu perfil
+              </p>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-col sm:gap-1 sm:overflow-visible sm:pb-0">
+                {availableTabs.map((tabId) => (
+                  <button
+                    key={tabId}
+                    onClick={() => handleTabChange(tabId)}
+                    className={`shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-xs transition-colors cursor-pointer sm:w-full sm:text-left sm:text-sm ${activeTab === tabId
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted"
+                      }`}
+                  >
+                    {PROFILE_TAB_LABELS[tabId]}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
             {/* Profile card */}
-            <div className="bg-card border rounded-lg p-6 text-center">
-              <div className="relative inline-block mb-4">
-                <button
-                  type="button"
-                  aria-label={avatarDisplayUrl ? "Ver foto do perfil" : "Foto de perfil"}
-                  onClick={avatarDisplayUrl ? handleViewAvatar : undefined}
-                  disabled={isUploadingAvatar}
-                  className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : avatarDisplayUrl ? "cursor-pointer group" : "cursor-default"}`}
-                >
-                  {isUploadingAvatar && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                      <Loader2 className="h-8 w-8 animate-spin text-white" />
-                    </div>
-                  )}
-
-                  {avatarDisplayUrl ? (
-                    <Image
-                      src={avatarDisplayUrl}
-                      alt={profileDisplayName}
-                      width={100}
-                      height={100}
-                      key={avatarDisplayUrl}
-                      unoptimized={avatarDisplayUrl.startsWith("blob:")}
-                      className="rounded-full object-cover h-24 w-24"
-                    />
-                  ) : (
-                    <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-2xl font-semibold text-primary">
-                        {(user.firstName?.[0] || "").toUpperCase()}
-                        {(user.lastName?.[0] || "").toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </button>
-
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  id="avatar-upload"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={handleAvatarChange}
-                  disabled={isUploadingAvatar}
-                />
-              </div>
-              <div className="mb-4 flex items-center justify-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  onClick={openAvatarFilePicker}
-                  disabled={isUploadingAvatar}
-                  className="h-8 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm disabled:cursor-not-allowed"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Trocar foto
-                </Button>
-              </div>
+            <div className="bg-card border rounded-lg p-4 text-center sm:p-6">
               <h2 className="text-lg font-semibold">{user.firstName} {user.lastName}</h2>
               {isMusician && musicianProfile?.category && (
                 <p className="text-sm text-muted-foreground mb-2">
@@ -1075,7 +1146,7 @@ export default function PerfilPage() {
                   <a
                     href={`/musico/${musicianProfile.id}`}
                     target="_blank"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
                     rel="noopener noreferrer"
                   >
                     Ver Perfil Público
@@ -1083,68 +1154,117 @@ export default function PerfilPage() {
                 </div>
               )}
             </div>
-            {/* Navigation menu */}
-            <nav className="flex flex-col space-y-2">
-              {availableTabs.map((tabId) => (
-                <button
-                  key={tabId}
-                  onClick={() => handleTabChange(tabId)}
-                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${activeTab === tabId
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                    }`}
-                >
-                  {PROFILE_TAB_LABELS[tabId]}
-                </button>
-              ))}
-            </nav>
           </aside>
           {/* Content area */}
-          <main className="space-y-8">
+          <main className="min-w-0 space-y-6 sm:space-y-8">
             {/* Personal Info Tab */}
             {activeTab === "info-pessoais" && (
-              <div className="bg-card border rounded-lg p-6 space-y-4">
-                <div className="flex justify-between items-center">
+              <div className="bg-card border rounded-lg p-4 space-y-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">
                     Informações Pessoais
                   </h3>
-                  {!editPersonal ? (
-                    <Button size="sm" onClick={() => setEditPersonal(true)}>
-                      Editar
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={savePersonalInfo} disabled={isUpdating}>
+                      {isUpdating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Salvar alterações"
+                      )}
                     </Button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={savePersonalInfo} disabled={isUpdating}>
-                        {isUpdating ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Salvando...
-                          </>
-                        ) : (
-                          "Salvar"
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isUpdating}
-                        onClick={() => {
-                          setEditPersonal(false);
-                          // Reset form values to original when canceling
-                          setPersonalForm({
-                            firstName: user.firstName || "",
-                            lastName: user.lastName || "",
-                            email: user.email || "",
-                            phone: user.phone || "",
-                            city: user.city || "",
-                            state: user.state || "",
-                          });
-                        }}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isUpdating}
+                      onClick={resetPersonalForm}
+                    >
+                      Reverter
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="relative inline-block mx-auto sm:mx-0">
+                      <button
+                        type="button"
+                        aria-label={avatarDisplayUrl ? "Ver foto do perfil" : "Foto de perfil"}
+                        onClick={avatarDisplayUrl ? handleViewAvatar : undefined}
+                        disabled={isUploadingAvatar}
+                        className={`relative block rounded-full ${isUploadingAvatar ? "cursor-not-allowed" : avatarDisplayUrl ? "cursor-pointer group" : "cursor-default"}`}
                       >
-                        Cancelar
-                      </Button>
+                        {isUploadingAvatar && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                            <Loader2 className="h-8 w-8 animate-spin text-white" />
+                          </div>
+                        )}
+
+                        {avatarDisplayUrl ? (
+                          <Image
+                            src={avatarDisplayUrl}
+                            alt={profileDisplayName}
+                            width={110}
+                            height={110}
+                            key={avatarDisplayUrl}
+                            unoptimized={avatarDisplayUrl.startsWith("blob:")}
+                            className="rounded-full object-cover h-24 w-24 sm:h-28 sm:w-28"
+                          />
+                        ) : (
+                          <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-2xl font-semibold text-primary">
+                              {(user.firstName?.[0] || "").toUpperCase()}
+                              {(user.lastName?.[0] || "").toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </button>
                     </div>
-                  )}
+
+                    <div className="flex-1 space-y-2 text-center sm:text-left">
+                      <p className="text-base font-semibold">{profileDisplayName}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      {(user.city || user.state) && (
+                        <p className="text-xs inline-flex items-center gap-1 text-muted-foreground">
+                          <MapPin className="h-3 w-3" /> {user.city}{user.city && user.state ? ", " : ""}{user.state}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="default"
+                          onClick={openAvatarFilePicker}
+                          disabled={isUploadingAvatar}
+                          className="h-8 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm disabled:cursor-not-allowed"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          Trocar foto
+                        </Button>
+                        {isMusician && musicianProfile?.id && (
+                          <Button size="sm" variant="outline" asChild className="h-8">
+                            <a
+                              href={`/musico/${musicianProfile.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Ver perfil público
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    id="avatar-upload"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={handleAvatarChange}
+                    disabled={isUploadingAvatar}
+                  />
                 </div>
                 <form onSubmit={savePersonalInfo} className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -1161,7 +1281,7 @@ export default function PerfilPage() {
                         onChange={(e) =>
                           handlePersonalChange("firstName", e.target.value)
                         }
-                        readOnly={!editPersonal}
+                        className="cursor-pointer"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1174,7 +1294,7 @@ export default function PerfilPage() {
                         onChange={(e) =>
                           handlePersonalChange("lastName", e.target.value)
                         }
-                        readOnly={!editPersonal}
+                        className="cursor-pointer"
                       />
                     </div>
                   </div>
@@ -1187,8 +1307,7 @@ export default function PerfilPage() {
                       type="email"
                       value={personalForm.email}
                       readOnly
-                      disabled
-                      className="bg-muted"
+                      className="bg-muted cursor-pointer"
                     />
                     <p className="text-xs text-muted-foreground">
                       O e-mail não pode ser alterado.
@@ -1205,36 +1324,70 @@ export default function PerfilPage() {
                         onChange={(e) =>
                           handlePersonalChange("phone", e.target.value)
                         }
-                        readOnly={!editPersonal}
+                        placeholder="(00) 00000-0000"
+                        className="cursor-pointer"
                       />
                     </div>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label htmlFor="city" className="text-sm font-medium">
-                        Cidade
-                      </label>
-                      <Input
-                        id="city"
-                        value={personalForm.city}
-                        onChange={(e) =>
-                          handlePersonalChange("city", e.target.value)
-                        }
-                        readOnly={!editPersonal}
-                      />
-                    </div>
-                    <div className="space-y-1">
                       <label htmlFor="state" className="text-sm font-medium">
                         Estado
                       </label>
-                      <Input
-                        id="state"
-                        value={personalForm.state}
-                        onChange={(e) =>
-                          handlePersonalChange("state", e.target.value)
+                      <Select
+                        value={personalForm.state || "all"}
+                        onValueChange={(value) => {
+                          const nextState = value === "all" ? "" : value;
+                          handlePersonalChange("state", nextState);
+                          handlePersonalChange("city", "");
+                        }}
+                      >
+                        <SelectTrigger id="state" className="w-full text-sm cursor-pointer">
+                          <span className="inline-flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {personalForm.state
+                              ? states.find((state) => state.sigla === personalForm.state)?.nome || personalForm.state
+                              : "Estado"}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="cursor-pointer">Todos os estados</SelectItem>
+                          {states.map((state) => (
+                            <SelectItem key={state.sigla} value={state.sigla} className="cursor-pointer">
+                              {state.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="city" className="text-sm font-medium">
+                        Cidade
+                      </label>
+                      <Select
+                        value={personalForm.city || "all"}
+                        onValueChange={(value) =>
+                          handlePersonalChange("city", value === "all" ? "" : value)
                         }
-                        readOnly={!editPersonal}
-                      />
+                        disabled={!personalForm.state}
+                      >
+                        <SelectTrigger id="city" className="w-full text-sm cursor-pointer">
+                          <span className="inline-flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {isLoadingCities
+                              ? "Carregando cidades..."
+                              : personalForm.city || "Cidade"}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="cursor-pointer">Todas as cidades</SelectItem>
+                          {cities.map((city) => (
+                            <SelectItem key={city.id} value={city.nome} className="cursor-pointer">
+                              {city.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </form>
@@ -1242,41 +1395,31 @@ export default function PerfilPage() {
             )}
             {/* Musical Info Tab */}
             {activeTab === "info-musicais" && (
-              <div className="bg-card border rounded-lg p-6 space-y-4">
-                <div className="flex justify-between items-center">
+              <div className="bg-card border rounded-lg p-4 space-y-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-lg font-semibold">
                     Informações Musicais
                   </h3>
-                  {!editMusical ? (
-                    <Button size="sm" onClick={() => setEditMusical(true)}>
-                      Editar
-                    </Button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={saveMusicalInfo}>
-                        Salvar
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={saveMusicalInfo} disabled={isSavingMusical}>
+                        {isSavingMusical ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Salvando...
+                          </>
+                        ) : (
+                          "Salvar alterações"
+                        )}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          setEditMusical(false);
-                          if (musicianProfile) {
-                            setMusicalForm({
-                              instruments: musicianProfile.instruments?.map((i) => i.slug) || [],
-                              genres: musicianProfile.genres?.map((g) => g.slug) || [],
-                              bio: musicianProfile.bio || "",
-                              experience: musicianProfile.experience || "",
-                              priceRange: musicianProfile.priceFrom ? getPriceRangeFromValue(musicianProfile.priceFrom) : "",
-                              equipment: musicianProfile.equipment || "",
-                            });
-                          }
-                        }}
+                        disabled={isSavingMusical}
+                        onClick={resetMusicalForm}
                       >
-                        Cancelar
+                        Reverter
                       </Button>
                     </div>
-                  )}
                 </div>
                 <form onSubmit={saveMusicalInfo} className="space-y-4">
                   <div className="space-y-1">
@@ -1288,7 +1431,11 @@ export default function PerfilPage() {
                         return (
                           <label
                             key={option.value}
-                            className="flex items-center gap-2 text-sm cursor-pointer"
+                            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors cursor-pointer ${
+                              checked
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border hover:border-primary/40 hover:bg-muted/70"
+                            }`}
                           >
                             <Checkbox
                               checked={checked}
@@ -1299,7 +1446,7 @@ export default function PerfilPage() {
                                   !!val
                                 )
                               }
-                              disabled={!editMusical}
+                              className="cursor-pointer"
                             />
                             <span>{option.label}</span>
                           </label>
@@ -1315,14 +1462,18 @@ export default function PerfilPage() {
                         return (
                           <label
                             key={option.value}
-                            className="flex items-center gap-2 text-sm cursor-pointer"
+                            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors cursor-pointer ${
+                              checked
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border hover:border-primary/40 hover:bg-muted/70"
+                            }`}
                           >
                             <Checkbox
                               checked={checked}
                               onCheckedChange={(val) =>
                                 handleMusicalCheckbox("genres", option.value, !!val)
                               }
-                              disabled={!editMusical}
+                              className="cursor-pointer"
                             />
                             <span>{option.label}</span>
                           </label>
@@ -1343,16 +1494,15 @@ export default function PerfilPage() {
                         onValueChange={(value) =>
                           handleMusicalChange("experience", value)
                         }
-                        disabled={!editMusical}
                       >
-                        <SelectTrigger id="experience" className="w-full">
+                        <SelectTrigger id="experience" className="w-full cursor-pointer">
                           {experienceOptions.find(
                             (o) => o.value === musicalForm.experience
                           )?.label || "Selecione"}
                         </SelectTrigger>
                         <SelectContent>
                           {experienceOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                            <SelectItem key={option.value} value={option.value} className="cursor-pointer">
                               {option.label}
                             </SelectItem>
                           ))}
@@ -1371,16 +1521,15 @@ export default function PerfilPage() {
                         onValueChange={(value) =>
                           handleMusicalChange("priceRange", value)
                         }
-                        disabled={!editMusical}
                       >
-                        <SelectTrigger id="priceRange" className="w-full">
+                        <SelectTrigger id="priceRange" className="w-full cursor-pointer">
                           {priceOptions.find(
                             (o) => o.value === musicalForm.priceRange
                           )?.label || "Selecione"}
                         </SelectTrigger>
                         <SelectContent>
                           {priceOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                            <SelectItem key={option.value} value={option.value} className="cursor-pointer">
                               {option.label}
                             </SelectItem>
                           ))}
@@ -1398,7 +1547,6 @@ export default function PerfilPage() {
                       onChange={(e) =>
                         handleMusicalChange("bio", e.target.value)
                       }
-                      readOnly={!editMusical}
                       rows={4}
                     />
                   </div>
@@ -1412,7 +1560,6 @@ export default function PerfilPage() {
                       onChange={(e) =>
                         handleMusicalChange("equipment", e.target.value)
                       }
-                      readOnly={!editMusical}
                       rows={4}
                     />
                   </div>
@@ -1422,7 +1569,7 @@ export default function PerfilPage() {
             {/* Portfolio Tab */}
             {activeTab === "portfolio" && (
               <div className="space-y-6">
-                <div className="bg-card border rounded-lg p-6">
+                <div className="bg-card border rounded-lg p-4 sm:p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Meu Portfólio</h3>
                     {isMusician && (
@@ -1573,14 +1720,14 @@ export default function PerfilPage() {
                 {/* Upload Modal */}
                 {showUploadModal && (
                   <div
-                    className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+                    className="fixed inset-0 z-[90] flex items-end justify-center bg-black/65 p-0 md:items-center md:p-4 lg:p-6"
                     onClick={closeUploadModal}
                   >
                     <div
-                      className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 bg-card shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-5xl sm:rounded-[28px] sm:border"
+                      className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 bg-card shadow-2xl md:h-auto md:max-h-[94dvh] md:max-w-6xl md:rounded-[28px] md:border"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="border-b bg-muted/20 px-4 py-4 sm:px-8 sm:py-6">
+                      <div className="sticky top-0 z-10 border-b bg-card/95 px-4 py-3 backdrop-blur md:px-6 md:py-5 lg:px-8">
                         <div className="flex items-start justify-between gap-4">
                           <div className="space-y-3">
                             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -1588,16 +1735,16 @@ export default function PerfilPage() {
                               Novo item do portfólio
                             </div>
                             <div>
-                              <h3 className="text-xl font-semibold tracking-tight sm:text-2xl">Adicionar ao Portfólio</h3>
-                              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                                Escolha a mídia, preencha os detalhes e confirme o envio.
+                              <h3 className="text-lg font-semibold tracking-tight sm:text-xl lg:text-2xl">Adicionar ao Portfólio</h3>
+                              <p className="mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm">
+                                1) Escolha um arquivo, 2) defina o título, 3) publique.
                               </p>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={closeUploadModal}
-                            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             disabled={isUploadingPortfolio}
                           >
                             <X className="h-5 w-5" />
@@ -1605,7 +1752,7 @@ export default function PerfilPage() {
                         </div>
                       </div>
 
-                      <div className="grid flex-1 gap-4 overflow-y-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:p-8">
+                      <div className="grid flex-1 gap-4 overflow-y-auto p-4 md:gap-5 md:p-6 lg:gap-6 lg:p-8 xl:grid-cols-[360px_minmax(0,1fr)]">
                         <div className="space-y-4">
                           <div
                             className={`rounded-[24px] border-2 border-dashed p-4 transition-colors sm:p-5 ${
@@ -1613,6 +1760,16 @@ export default function PerfilPage() {
                                 ? "border-primary bg-primary/5"
                                 : "border-border bg-muted/15"
                             }`}
+                            role="button"
+                            tabIndex={isPortfolioFileSelectionDisabled ? -1 : 0}
+                            aria-label="Selecionar arquivo de mídia"
+                            onClick={openPortfolioFilePicker}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openPortfolioFilePicker();
+                              }
+                            }}
                             onDrop={handlePortfolioFileDrop}
                             onDragOver={handlePortfolioFileDragOver}
                             onDragLeave={handlePortfolioFileDragLeave}
@@ -1622,9 +1779,6 @@ export default function PerfilPage() {
                               id="portfolio-file"
                               ref={portfolioInputRef}
                               accept={canUploadVideoAudio ? PORTFOLIO_MEDIA_ACCEPT : PORTFOLIO_IMAGE_ACCEPT}
-                              onClick={(event) => {
-                                event.currentTarget.value = "";
-                              }}
                               onChange={handlePortfolioFileChange}
                               disabled={isPortfolioFileSelectionDisabled}
                               className="sr-only"
@@ -1637,7 +1791,7 @@ export default function PerfilPage() {
                                 </p>
                                 <h4 className="mt-1 text-base font-semibold">Escolha a mídia</h4>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                  Arraste o arquivo para esta área ou selecione manualmente.
+                                  Arraste aqui ou clique em <span className="font-medium">Selecionar arquivo</span>.
                                 </p>
                               </div>
                               <div className="rounded-full bg-primary/10 p-3 text-primary">
@@ -1695,7 +1849,10 @@ export default function PerfilPage() {
                                     <Button
                                       type="button"
                                       variant="ghost"
-                                      onClick={clearSelectedPortfolioFile}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        clearSelectedPortfolioFile();
+                                      }}
                                       disabled={isUploadingPortfolio}
                                     >
                                       Remover
@@ -1710,26 +1867,31 @@ export default function PerfilPage() {
                                 </div>
                                 <p className="text-base font-semibold sm:text-lg">Selecione seu arquivo</p>
                                 <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
-                                  Fotos, vídeos e áudios das suas apresentações para exibir no perfil.
+                                  Formatos: imagem, vídeo e áudio.
                                 </p>
                               </div>
                             )}
 
                             <div className="mt-5 flex flex-wrap gap-2">
-                              <label
-                                htmlFor="portfolio-file"
-                                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openPortfolioFilePicker();
+                                }}
+                                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                                   isPortfolioFileSelectionDisabled
                                     ? "cursor-not-allowed bg-muted text-muted-foreground"
                                     : "bg-primary text-primary-foreground hover:bg-primary/90"
                                 }`}
+                                disabled={isPortfolioFileSelectionDisabled}
                               >
                                 <Upload className="h-4 w-4" />
                                 {selectedPortfolioFile ? "Trocar arquivo" : "Selecionar arquivo"}
-                              </label>
+                              </button>
                               {selectedPortfolioFile && (
                                 <p className="self-center text-xs text-muted-foreground">
-                                  O título precisa ser preenchido manualmente.
+                                  Próximo passo: informe o título.
                                 </p>
                               )}
                             </div>
@@ -1737,62 +1899,33 @@ export default function PerfilPage() {
 
                           {!canUploadVideoAudio && (
                             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                              Apenas imagens estão liberadas no plano atual.{" "}
+                              No seu plano atual, apenas imagens estão liberadas.{" "}
                               {!canUploadPhoto && (
                                 <span className="font-semibold">
                                   Limite de {maxPhotosLimit} fotos atingido.{" "}
                                 </span>
                               )}
                               <Link href="/planos" className="font-medium underline">
-                                Upgrade para vídeos e áudios
+                                Fazer upgrade
                               </Link>
                             </div>
                           )}
 
-                          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
-                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
-                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
-                                <ImageIcon className="h-4 w-4" />
-                              </div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Fotos
-                              </p>
-                              <p className="mt-1 text-sm font-medium">JPG, PNG, WebP</p>
-                              <p className="text-xs text-muted-foreground">Até 5MB</p>
-                            </div>
-                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
-                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
-                                <Video className="h-4 w-4" />
-                              </div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Vídeos
-                              </p>
-                              <p className="mt-1 text-sm font-medium">MP4, WebM, MOV</p>
-                              <p className="text-xs text-muted-foreground">Até 50MB</p>
-                            </div>
-                            <div className="min-w-[112px] rounded-2xl border bg-background px-3 py-3 sm:min-w-0">
-                              <div className="mb-2 inline-flex rounded-full bg-primary/10 p-2 text-primary">
-                                <FileAudio className="h-4 w-4" />
-                              </div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Áudios
-                              </p>
-                              <p className="mt-1 text-sm font-medium">MP3, WAV, OGG</p>
-                              <p className="text-xs text-muted-foreground">Até 10MB</p>
-                            </div>
+                          <div className="rounded-2xl border bg-background px-4 py-3 text-xs text-muted-foreground">
+                            <p>
+                              <span className="font-medium text-foreground">Formatos aceitos:</span>{" "}
+                              Fotos (JPG, PNG, WebP), Vídeos (MP4, WebM, MOV) e Áudios (MP3, WAV, OGG).
+                            </p>
                           </div>
                         </div>
 
                         <div className="space-y-4">
                           <div className="rounded-[24px] border bg-background p-4 sm:p-6">
-                            <div className="mb-5">
+                            <div className="mb-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                                 Etapa 2
                               </p>
-                              <h4 className="mt-1 text-base font-semibold">Informações que aparecem no card</h4>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                O título é obrigatório. Os outros campos ajudam a contextualizar a mídia.
-                              </p>
+                              <h4 className="mt-1 text-base font-semibold">Preencha os dados da mídia</h4>
                             </div>
 
                             <div className="space-y-4">
@@ -1812,100 +1945,125 @@ export default function PerfilPage() {
                                 </p>
                               </div>
 
-                              <div className="space-y-1.5">
-                                <label htmlFor="portfolio-description" className="text-sm font-medium">
-                                  Descrição
-                                </label>
-                                <Textarea
-                                  id="portfolio-description"
-                                  value={uploadForm.description}
-                                  onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                                  placeholder="Descreva brevemente o contexto dessa apresentação"
-                                  rows={4}
-                                  disabled={isUploadingPortfolio}
-                                />
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowOptionalPortfolioFields((current) => !current)
+                                }
+                                className="text-xs font-medium text-primary hover:underline"
+                              >
+                                {showOptionalPortfolioFields
+                                  ? "Ocultar campos opcionais"
+                                  : "Adicionar detalhes opcionais (descrição, gênero, data, local)"}
+                              </button>
 
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1.5">
-                                  <label htmlFor="portfolio-genre" className="text-sm font-medium">
-                                    Gênero
-                                  </label>
-                                  <Input
-                                    id="portfolio-genre"
-                                    value={uploadForm.genre}
-                                    onChange={(e) => setUploadForm({ ...uploadForm, genre: e.target.value })}
-                                    placeholder="Ex: Jazz"
-                                    disabled={isUploadingPortfolio}
-                                  />
+                              {showOptionalPortfolioFields && (
+                                <div className="space-y-4 rounded-xl border bg-muted/20 p-3 sm:p-4">
+                                  <div className="space-y-1.5">
+                                    <label htmlFor="portfolio-description" className="text-sm font-medium">
+                                      Descrição
+                                    </label>
+                                    <Textarea
+                                      id="portfolio-description"
+                                      value={uploadForm.description}
+                                      onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                                      placeholder="Descreva brevemente o contexto dessa apresentação"
+                                      rows={4}
+                                      disabled={isUploadingPortfolio}
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                      <label htmlFor="portfolio-genre" className="text-sm font-medium">
+                                        Gênero
+                                      </label>
+                                      <Input
+                                        id="portfolio-genre"
+                                        value={uploadForm.genre}
+                                        onChange={(e) => setUploadForm({ ...uploadForm, genre: e.target.value })}
+                                        placeholder="Ex: Jazz"
+                                        disabled={isUploadingPortfolio}
+                                      />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                      <label htmlFor="portfolio-date" className="text-sm font-medium">
+                                        Data
+                                      </label>
+                                      <Input
+                                        id="portfolio-date"
+                                        type="date"
+                                        value={uploadForm.date}
+                                        onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
+                                        disabled={isUploadingPortfolio}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label htmlFor="portfolio-location" className="text-sm font-medium">
+                                      Local
+                                    </label>
+                                    <Input
+                                      id="portfolio-location"
+                                      value={uploadForm.location}
+                                      onChange={(e) => setUploadForm({ ...uploadForm, location: e.target.value })}
+                                      placeholder="Ex: São Paulo, SP"
+                                      disabled={isUploadingPortfolio}
+                                    />
+                                  </div>
                                 </div>
-
-                                <div className="space-y-1.5">
-                                  <label htmlFor="portfolio-date" className="text-sm font-medium">
-                                    Data
-                                  </label>
-                                  <Input
-                                    id="portfolio-date"
-                                    type="date"
-                                    value={uploadForm.date}
-                                    onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
-                                    disabled={isUploadingPortfolio}
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label htmlFor="portfolio-location" className="text-sm font-medium">
-                                  Local
-                                </label>
-                                <Input
-                                  id="portfolio-location"
-                                  value={uploadForm.location}
-                                  onChange={(e) => setUploadForm({ ...uploadForm, location: e.target.value })}
-                                  placeholder="Ex: São Paulo, SP"
-                                  disabled={isUploadingPortfolio}
-                                />
-                              </div>
+                              )}
                             </div>
                           </div>
 
                           {selectedPortfolioFile && !uploadForm.title.trim() && (
                             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                              Agora defina um título para liberar o envio.
+                              Falta apenas o título para liberar o envio.
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="border-t bg-background/95 px-4 py-3 backdrop-blur sm:px-8 sm:py-4">
-                        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeUploadModal}
-                            disabled={isUploadingPortfolio}
-                            className="w-full sm:w-auto"
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={handleSubmitPortfolioUpload}
-                            disabled={isUploadingPortfolio || !selectedPortfolioFile || !uploadForm.title.trim()}
-                            className="w-full sm:w-auto"
-                          >
-                            {isUploadingPortfolio ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="h-4 w-4" />
-                                Enviar para o portfólio
-                              </>
-                            )}
-                          </Button>
+                      <div className="sticky bottom-0 border-t bg-background/95 px-4 py-3 backdrop-blur md:px-6 md:py-4 lg:px-8">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            {!hasPortfolioUploadFile
+                              ? "Selecione um arquivo para continuar."
+                              : !hasPortfolioTitle
+                                ? "Agora preencha o título da mídia."
+                                : "Tudo pronto. Clique em enviar para publicar no portfólio."}
+                          </p>
+                          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={closeUploadModal}
+                              disabled={isUploadingPortfolio}
+                              className="w-full sm:w-auto"
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleSubmitPortfolioUpload}
+                              disabled={isUploadingPortfolio || !isPortfolioUploadReady}
+                              className="w-full sm:w-auto"
+                            >
+                              {isUploadingPortfolio ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Enviando...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4" />
+                                  Enviar para o portfólio
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1974,7 +2132,7 @@ export default function PerfilPage() {
             {activeTab === "avaliacoes" && (
               <div className="space-y-6">
                 {!isMusician ? (
-                  <div className="bg-card border rounded-lg p-6">
+                  <div className="bg-card border rounded-lg p-4 sm:p-6">
                     <h3 className="text-lg font-semibold mb-2">Avaliações</h3>
                     <p className="text-sm text-muted-foreground">
                       Apenas perfis de músico possuem avaliações públicas.
@@ -1982,7 +2140,7 @@ export default function PerfilPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="bg-card border rounded-lg p-6 space-y-4">
+                    <div className="bg-card border rounded-lg p-4 space-y-4 sm:p-6">
                       <h3 className="text-lg font-semibold">Resumo de Avaliações</h3>
                       {reviewStats ? (
                         <>
@@ -2034,7 +2192,7 @@ export default function PerfilPage() {
                       )}
                     </div>
 
-                    <div className="bg-card border rounded-lg p-6 space-y-4">
+                    <div className="bg-card border rounded-lg p-4 space-y-4 sm:p-6">
                       <div className="flex items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold">Avaliações recebidas</h3>
                         <Button
@@ -2125,8 +2283,8 @@ export default function PerfilPage() {
             {/* Subscription Tab */}
             {activeTab === "assinatura" && (
               <div className="space-y-6">
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-6">
+                <div className="bg-card border rounded-lg p-4 sm:p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
                       Minha Assinatura
@@ -2330,15 +2488,6 @@ export default function PerfilPage() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-            {activeTab === "configuracoes" && (
-              <div className="bg-card border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2">Configurações</h3>
-                <p className="text-sm text-muted-foreground">
-                  Ajustes de conta e preferências estarão disponíveis aqui em
-                  breve.
-                </p>
               </div>
             )}
           </main>

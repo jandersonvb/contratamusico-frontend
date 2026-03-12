@@ -283,7 +283,7 @@ function SearchPageContent() {
         </section>
 
         <section className="container mx-auto px-4 flex-1 py-4 sm:py-8">
-          <div className="sticky top-2 z-40 bg-background/95 backdrop-blur-sm border rounded-xl p-3 sm:p-4 mb-4 shadow-sm">
+          <div className="sticky top-[4.5rem] z-40 bg-background/95 backdrop-blur-sm border rounded-xl p-3 sm:p-4 mb-4 shadow-sm">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="w-full sm:w-auto sm:min-w-[190px]">
@@ -488,7 +488,7 @@ function SearchPageContent() {
                         key={genre.slug}
                         type="button"
                         onClick={() => toggleGenre(genre.slug)}
-                        className={`text-xs sm:text-sm rounded-full border px-3 py-1.5 whitespace-nowrap transition-colors ${
+                        className={`text-xs sm:text-sm rounded-full border px-3 py-1.5 whitespace-nowrap transition-colors cursor-pointer ${
                           isActive
                             ? "bg-primary text-primary-foreground border-primary"
                             : "hover:bg-muted"

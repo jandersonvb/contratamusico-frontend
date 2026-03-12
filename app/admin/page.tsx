@@ -334,7 +334,7 @@ export default function AdminPage() {
       },
       {
         label: "Receita mensal",
-        value: currencyFormatter.format(dashboard.monthlyRevenue),
+        value: currencyFormatter.format(dashboard.monthlyRevenue / 100),
         description: "Faturamento consolidado no período.",
         icon: TrendingUp,
       },

@@ -103,7 +103,10 @@ export default function PlanosPage() {
     }
 
     if (plan.monthlyPrice === 0) {
-      toast.info("Plano gratuito - não requer pagamento");
+      toast.success(
+        "O plano gratuito já está disponível para você. Complete seu perfil para começar."
+      );
+      router.push("/perfil");
       return;
     }
 
@@ -245,7 +248,7 @@ export default function PlanosPage() {
                       ) : isClientUser ? (
                         "Disponível para músicos"
                       ) : plan.monthlyPrice === 0 ? (
-                        "Começar Grátis"
+                        isLoggedIn ? "Plano Gratuito" : "Começar Grátis"
                       ) : (
                         "Assinar Agora"
                       )}
