@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/lib/stores/userStore";
 import { SocialLoginProvider, UserType } from "@/lib/types/user";
 import { cn } from "@/lib/utils";
+import { setClarityTag, trackFunnelEvent } from "@/lib/tracking";
 
 interface SocialLoginButtonsProps {
   rememberMe?: boolean;
@@ -97,6 +98,32 @@ const isFacebookServerConfigError = (message: string) => {
   );
 };
 
+const getSocialErrorCode = (message: string) => {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("cancelad") ||
+    normalizedMessage.includes("dismiss") ||
+    normalizedMessage.includes("skip")
+  ) {
+    return "social_login_canceled";
+  }
+
+  if (
+    normalizedMessage.includes("indispon") ||
+    normalizedMessage.includes("nao foi possível") ||
+    normalizedMessage.includes("não foi possível")
+  ) {
+    return "social_provider_unavailable";
+  }
+
+  if (normalizedMessage.includes("token")) {
+    return "social_token_missing";
+  }
+
+  return "social_auth_error";
+};
+
 function GoogleBrandIcon() {
   return (
     <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
@@ -148,6 +175,7 @@ export function SocialLoginButtons({
   className,
 }: SocialLoginButtonsProps) {
   const socialLogin = useUserStore((state) => state.socialLogin);
+  const authFlow = enforceSignupRequirements ? "signup" : "login";
 
   const [googleReady, setGoogleReady] = useState(false);
   const [facebookReady, setFacebookReady] = useState(false);
@@ -211,11 +239,23 @@ export function SocialLoginButtons({
     }
 
     if (terms !== true) {
+      trackFunnelEvent("signup_social_blocked", {
+        auth_flow: "signup",
+        provider: "google_or_facebook",
+        reason: "terms_required",
+      });
+      setClarityTag("signup_last_error", "terms_required");
       toast.error("Aceite os termos para continuar com login social.");
       return false;
     }
 
     if (!userType) {
+      trackFunnelEvent("signup_social_blocked", {
+        auth_flow: "signup",
+        provider: "google_or_facebook",
+        reason: "user_type_required",
+      });
+      setClarityTag("signup_last_error", "user_type_required");
       toast.error("Selecione se você é contratante ou músico antes de continuar.");
       return false;
     }
@@ -232,11 +272,26 @@ export function SocialLoginButtons({
           rememberMe,
           ...(enforceSignupRequirements ? { userType, terms } : {}),
         });
+        trackFunnelEvent(`${authFlow}_social_success`, {
+          auth_flow: authFlow,
+          provider,
+        });
+        setClarityTag(`${authFlow}_last_status`, "success");
+        setClarityTag(`${authFlow}_last_social_provider`, provider);
         toast.success(successMessage);
         onSuccess?.();
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Falha ao realizar login social.";
+        const errorCode = getSocialErrorCode(message);
+
+        trackFunnelEvent(`${authFlow}_social_error`, {
+          auth_flow: authFlow,
+          provider,
+          error_code: errorCode,
+        });
+        setClarityTag(`${authFlow}_last_status`, "error");
+        setClarityTag(`${authFlow}_last_error`, errorCode);
 
         if (provider === SocialLoginProvider.GOOGLE && isGoogleServerConfigError(message)) {
           setGoogleAvailable(false);
@@ -263,6 +318,7 @@ export function SocialLoginButtons({
       }
     },
     [
+      authFlow,
       enforceSignupRequirements,
       onSuccess,
       rememberMe,
@@ -278,7 +334,19 @@ export function SocialLoginButtons({
       return;
     }
 
+    trackFunnelEvent(`${authFlow}_social_click`, {
+      auth_flow: authFlow,
+      provider: SocialLoginProvider.GOOGLE,
+    });
+    setClarityTag("auth_flow", authFlow);
+    setClarityTag("auth_provider", SocialLoginProvider.GOOGLE);
+
     if (!canUseGoogle) {
+      trackFunnelEvent(`${authFlow}_social_error`, {
+        auth_flow: authFlow,
+        provider: SocialLoginProvider.GOOGLE,
+        error_code: "google_unavailable",
+      });
       toast.error("Login com Google indisponível no momento.");
       return;
     }
@@ -286,6 +354,11 @@ export function SocialLoginButtons({
     const googleIdentity = window.google?.accounts?.id;
 
     if (!googleIdentity) {
+      trackFunnelEvent(`${authFlow}_social_error`, {
+        auth_flow: authFlow,
+        provider: SocialLoginProvider.GOOGLE,
+        error_code: "google_sdk_not_loaded",
+      });
       toast.error("Google Login indisponível no momento. Recarregue a página.");
       return;
     }
@@ -303,6 +376,11 @@ export function SocialLoginButtons({
 
         if (!response.credential) {
           setLoadingProvider(null);
+          trackFunnelEvent(`${authFlow}_social_error`, {
+            auth_flow: authFlow,
+            provider: SocialLoginProvider.GOOGLE,
+            error_code: "google_token_missing",
+          });
           toast.error("Não foi possível obter o token do Google.");
           return;
         }
@@ -319,6 +397,11 @@ export function SocialLoginButtons({
       if (!callbackHandled && (notDisplayed || skipped || dismissed)) {
         callbackHandled = true;
         setLoadingProvider(null);
+        trackFunnelEvent(`${authFlow}_social_error`, {
+          auth_flow: authFlow,
+          provider: SocialLoginProvider.GOOGLE,
+          error_code: "google_prompt_dismissed",
+        });
 
         if (notDisplayed) {
           toast.error("Não foi possível abrir o login do Google.");
@@ -334,14 +417,26 @@ export function SocialLoginButtons({
         );
       }
     }, 15000);
-  }, [canUseGoogle, submitSocialToken, validateSignupRequirements]);
+  }, [authFlow, canUseGoogle, submitSocialToken, validateSignupRequirements]);
 
   const handleFacebookLogin = useCallback(() => {
     if (!validateSignupRequirements()) {
       return;
     }
 
+    trackFunnelEvent(`${authFlow}_social_click`, {
+      auth_flow: authFlow,
+      provider: SocialLoginProvider.FACEBOOK,
+    });
+    setClarityTag("auth_flow", authFlow);
+    setClarityTag("auth_provider", SocialLoginProvider.FACEBOOK);
+
     if (window.location.protocol !== "https:") {
+      trackFunnelEvent(`${authFlow}_social_error`, {
+        auth_flow: authFlow,
+        provider: SocialLoginProvider.FACEBOOK,
+        error_code: "facebook_requires_https",
+      });
       toast.error(
         "Login com Facebook exige HTTPS. Rode o frontend com HTTPS para continuar."
       );
@@ -349,11 +444,21 @@ export function SocialLoginButtons({
     }
 
     if (!canUseFacebook) {
+      trackFunnelEvent(`${authFlow}_social_error`, {
+        auth_flow: authFlow,
+        provider: SocialLoginProvider.FACEBOOK,
+        error_code: "facebook_unavailable",
+      });
       toast.error("Login com Facebook indisponível no momento.");
       return;
     }
 
     if (!facebookReady || !window.FB) {
+      trackFunnelEvent(`${authFlow}_social_error`, {
+        auth_flow: authFlow,
+        provider: SocialLoginProvider.FACEBOOK,
+        error_code: "facebook_sdk_not_loaded",
+      });
       toast.error("Facebook Login indisponível no momento. Recarregue a página.");
       return;
     }
@@ -366,6 +471,11 @@ export function SocialLoginButtons({
 
         if (!accessToken) {
           setLoadingProvider(null);
+          trackFunnelEvent(`${authFlow}_social_error`, {
+            auth_flow: authFlow,
+            provider: SocialLoginProvider.FACEBOOK,
+            error_code: "facebook_token_missing",
+          });
           toast.error("Login do Facebook cancelado ou não autorizado.");
           return;
         }
@@ -375,6 +485,7 @@ export function SocialLoginButtons({
       { scope: "public_profile,email" }
     );
   }, [
+    authFlow,
     facebookReady,
     canUseFacebook,
     submitSocialToken,

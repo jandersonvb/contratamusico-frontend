@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { UserPlus, Calendar, Music, EyeOff, Eye, Loader2 } from "lucide-react";
@@ -20,7 +20,30 @@ import { registerUser } from "@/api/auth";
 import { UserType } from "@/lib/types/user";
 import { useUserStore } from "@/lib/stores/userStore";
 import { sendStoredUtmAfterAuth } from "@/lib/utm";
+import { setClarityTag, trackFunnelEvent } from "@/lib/tracking";
 
+const getSignupErrorCode = (message: string) => {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("email") &&
+    (normalizedMessage.includes("exist") ||
+      normalizedMessage.includes("já") ||
+      normalizedMessage.includes("ja"))
+  ) {
+    return "email_exists";
+  }
+
+  if (normalizedMessage.includes("senha")) {
+    return "password_invalid";
+  }
+
+  if (normalizedMessage.includes("termo")) {
+    return "terms_required";
+  }
+
+  return "register_api_error";
+};
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -110,6 +133,24 @@ export default function CadastroPage() {
   const selectedSocialUserType =
     userType === "musico" ? UserType.MUSICIAN : UserType.CLIENT;
 
+  useEffect(() => {
+    trackFunnelEvent("signup_page_view", {
+      signup_method: "form",
+    });
+  }, []);
+
+  useEffect(() => {
+    setClarityTag("signup_role", userType);
+  }, [userType]);
+
+  const handleUserTypeChange = (nextUserType: "cliente" | "musico") => {
+    setUserType(nextUserType);
+    trackFunnelEvent("signup_role_selected", {
+      signup_role: nextUserType,
+    });
+    setClarityTag("signup_role", nextUserType);
+  };
+
   const handleCheckboxChange = (
     key: "instruments" | "genres",
     value: string
@@ -136,17 +177,39 @@ export default function CadastroPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    trackFunnelEvent("signup_submit_attempt", {
+      signup_method: "form",
+      signup_role: userType,
+    });
+    setClarityTag("signup_method", "form");
+    setClarityTag("signup_role", userType);
     
     // Basic client-side validation
     if (form.password !== form.confirmPassword) {
+      trackFunnelEvent("signup_validation_error", {
+        signup_validation_error: "password_mismatch",
+        signup_role: userType,
+      });
+      setClarityTag("signup_last_error", "password_mismatch");
       toast.error("As senhas não coincidem");
       return;
     }
     if (!form.terms) {
+      trackFunnelEvent("signup_validation_error", {
+        signup_validation_error: "terms_required",
+        signup_role: userType,
+      });
+      setClarityTag("signup_last_error", "terms_required");
       toast.error("Você precisa aceitar os termos para continuar");
       return;
     }
     if (form.password.length < 8) {
+      trackFunnelEvent("signup_validation_error", {
+        signup_validation_error: "password_too_short",
+        signup_role: userType,
+      });
+      setClarityTag("signup_last_error", "password_too_short");
       toast.error("A senha deve ter no mínimo 8 caracteres");
       return;
     }
@@ -192,12 +255,25 @@ export default function CadastroPage() {
       }
 
       toast.success("Conta criada com sucesso! Bem-vindo(a) à plataforma.");
+      trackFunnelEvent("signup_success", {
+        signup_method: "form",
+        signup_role: userType,
+      });
+      setClarityTag("signup_last_status", "success");
       
       // Redirecionar para o dashboard
       router.push("/dashboard");
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao criar conta';
+      const errorCode = getSignupErrorCode(message);
+      trackFunnelEvent("signup_error", {
+        signup_method: "form",
+        signup_role: userType,
+        signup_error_code: errorCode,
+      });
+      setClarityTag("signup_last_status", "error");
+      setClarityTag("signup_last_error", errorCode);
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -223,7 +299,7 @@ export default function CadastroPage() {
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
               <button
                 type="button"
-                onClick={() => setUserType("musico")}
+                onClick={() => handleUserTypeChange("musico")}
                 className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
                   userType === "musico"
                     ? "bg-primary text-primary-foreground border-primary"
@@ -238,7 +314,7 @@ export default function CadastroPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setUserType("cliente")}
+                onClick={() => handleUserTypeChange("cliente")}
                 className={`flex flex-col items-center justify-center rounded-md border p-3 sm:p-4 transition-colors text-center space-y-1 ${
                   userType === "cliente"
                     ? "bg-primary text-primary-foreground border-primary"
@@ -534,6 +610,11 @@ export default function CadastroPage() {
                   enforceSignupRequirements
                   successMessage="Autenticação social realizada com sucesso!"
                   onSuccess={() => {
+                    trackFunnelEvent("signup_success", {
+                      signup_method: "social",
+                      signup_role: userType,
+                    });
+                    setClarityTag("signup_last_status", "success");
                     router.push("/dashboard");
                   }}
                 />
