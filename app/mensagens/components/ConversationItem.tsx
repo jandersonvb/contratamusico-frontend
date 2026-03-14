@@ -54,7 +54,7 @@ export function ConversationItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-3 rounded-xl transition-all duration-150 flex items-center gap-3 ${
+      className={`w-full cursor-pointer text-left p-3 rounded-xl transition-all duration-150 flex items-center gap-3 ${
         isSelected
           ? "bg-primary/10 border border-primary/20"
           : "hover:bg-muted/80 border border-transparent"
